@@ -1,5 +1,7 @@
 # GPU Profiling Tools Survey
 
+> **Chrome sandbox note:** Any tool that uses DLL injection (RenderDoc, PIX, GPA, Nsight) requires `--disable-gpu-sandbox` when targeting Chrome's GPU process. Without it, the injected DLL cannot load into the sandboxed process. Add `--disable-gpu-watchdog` to prevent Chrome from killing the GPU process during long capture pauses.
+
 ## GPUView (ETW-based)
 
 Part of Windows SDK (Windows Performance Toolkit).

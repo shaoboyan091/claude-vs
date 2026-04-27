@@ -105,8 +105,17 @@ try {
     )
 
     if ($Arguments) {
+        # Chrome requires sandbox disabled for DLL injection capture
+        if ($Executable -match 'chrome' -and $Arguments -notmatch 'disable-gpu-sandbox') {
+            Write-Warning "Chrome detected: auto-adding --disable-gpu-sandbox --disable-gpu-watchdog for Nsight capture"
+            $Arguments = "$Arguments --disable-gpu-sandbox --disable-gpu-watchdog".Trim()
+        }
         $args += "--args"
         $args += "`"$Arguments`""
+    } elseif ($Executable -match 'chrome') {
+        Write-Warning "Chrome detected: auto-adding --disable-gpu-sandbox --disable-gpu-watchdog for Nsight capture"
+        $args += "--args"
+        $args += "`"--disable-gpu-sandbox --disable-gpu-watchdog`""
     }
 
     $args += "--output"

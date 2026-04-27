@@ -173,6 +173,12 @@ try {
             throw "Executable not found: $Executable"
         }
 
+        # Chrome requires sandbox disabled for DLL injection capture
+        if ($Executable -match 'chrome' -and $Arguments -notmatch 'disable-gpu-sandbox') {
+            Write-Warning "Chrome detected: auto-adding --disable-gpu-sandbox --disable-gpu-watchdog for RenderDoc capture"
+            $Arguments = "$Arguments --disable-gpu-sandbox --disable-gpu-watchdog".Trim()
+        }
+
         $argList = @("capture", "-w")
 
         if ($CaptureFrame -ge 0) {

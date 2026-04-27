@@ -86,6 +86,11 @@ try {
 
     # API-specific flags
     $extraChromeArgs = $ChromeArgs
+    # Chrome requires sandbox disabled for DLL injection capture
+    if ($Executable -match 'chrome' -and $extraChromeArgs -notmatch 'disable-gpu-sandbox') {
+        Write-Warning "Chrome detected: auto-adding --disable-gpu-sandbox --disable-gpu-watchdog for GPA capture"
+        $extraChromeArgs += " --disable-gpu-sandbox --disable-gpu-watchdog"
+    }
     switch ($Api) {
         "d3d12" {
             $args += "--hook-d3d11on12"

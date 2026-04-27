@@ -85,6 +85,11 @@ try {
     switch ($Target) {
         "gpu" {
             $chromeArgs += "--gpu-startup-dialog"
+            # Warn about sandbox when targeting GPU process
+            $allArgs = $ExtraArgs -join ' '
+            if ($allArgs -notmatch 'disable-gpu-sandbox') {
+                Write-Warning "Targeting GPU process: consider adding --disable-gpu-sandbox via -ExtraArgs if debugger attach fails"
+            }
         }
         "renderer" {
             $chromeArgs += "--renderer-startup-dialog"

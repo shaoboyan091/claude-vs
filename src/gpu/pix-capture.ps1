@@ -112,7 +112,13 @@ try {
 
     $psi = New-Object System.Diagnostics.ProcessStartInfo
     $psi.FileName = $Executable
-    $psi.Arguments = $Arguments
+    # Chrome requires sandbox disabled for DLL injection capture
+    $effectiveArgs = $Arguments
+    if ($Executable -match 'chrome' -and $effectiveArgs -notmatch 'disable-gpu-sandbox') {
+        Write-Warning "Chrome detected: auto-adding --disable-gpu-sandbox --disable-gpu-watchdog for PIX capture"
+        $effectiveArgs = "$effectiveArgs --disable-gpu-sandbox --disable-gpu-watchdog".Trim()
+    }
+    $psi.Arguments = $effectiveArgs
     $psi.UseShellExecute = $false
     $psi.EnvironmentVariables["PIX_CAPTURE_ON_CONNECT"] = "1"
     $psi.EnvironmentVariables["PIX_NUMBER_OF_FRAMES"] = $CaptureFrames.ToString()
