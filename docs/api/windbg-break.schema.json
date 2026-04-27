@@ -1,0 +1,89 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "windbg-break",
+  "description": "Set breakpoints in cdb.exe and capture state (stack, locals, registers) at each hit, with optional stepping",
+  "type": "object",
+  "properties": {
+    "input": {
+      "type": "object",
+      "properties": {
+        "Executable": { "type": "string", "description": "Path to executable to launch under debugger (launch mode)" },
+        "ProcessId": { "type": "integer", "description": "Target process ID (attach mode)" },
+        "Arguments": { "type": "string", "description": "Arguments for the executable (launch mode)" },
+        "WorkingDirectory": { "type": "string", "description": "Working directory for launched process (launch mode)" },
+        "Breakpoints": {
+          "type": "array",
+          "items": { "type": "string" },
+          "minItems": 1,
+          "description": "Breakpoint locations (e.g. module!Function, module!Class::Method)"
+        },
+        "BreakOnEntry": { "type": "boolean", "description": "Do not skip initial debugger breakpoint" },
+        "MaxHits": { "type": "integer", "default": 1, "description": "Max breakpoint hits before quitting" },
+        "OnHit": { "type": "string", "enum": ["stack", "locals", "full", "step"], "default": "full", "description": "Action at each breakpoint hit" },
+        "StepCount": { "type": "integer", "default": 10, "description": "Number of steps when OnHit=step" },
+        "StepMode": { "type": "string", "enum": ["over", "into"], "default": "over", "description": "Step over (p) or step into (t)" },
+        "OutputLog": { "type": "string", "description": "Path to write debugger output log" },
+        "CdbPath": { "type": "string", "description": "Path to cdb.exe" },
+        "Timeout": { "type": "integer", "default": 120, "description": "Timeout in seconds" }
+      },
+      "required": ["Breakpoints"],
+      "oneOf": [
+        { "required": ["ProcessId"] },
+        { "required": ["Executable"] }
+      ]
+    },
+    "output": {
+      "type": "object",
+      "properties": {
+        "success": { "type": "boolean" },
+        "mode": { "type": "string", "enum": ["attach", "launch"] },
+        "breakpoints": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "location": { "type": "string" },
+              "hitCount": { "type": "integer" },
+              "hits": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "stack": { "type": "string" },
+                    "locals": { "type": "string" },
+                    "registers": { "type": "string" },
+                    "steps": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "step": { "type": "integer" },
+                          "instruction": { "type": "string" },
+                          "stack": { "type": "string" },
+                          "locals": { "type": "string" }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "executable": { "type": "string", "description": "Launch mode only" },
+        "pid": { "type": "integer", "description": "Attach mode only" },
+        "processName": { "type": "string", "description": "Attach mode only" },
+        "stdout": { "type": "string" },
+        "stderr": { "type": "string" },
+        "logFile": { "type": "string" }
+      },
+      "required": ["success", "mode", "breakpoints"]
+    },
+    "errors": {
+      "type": "object",
+      "properties": {
+        "1": { "const": "Breakpoint debug failed, process not found, or timeout" }
+      }
+    }
+  }
+}

@@ -9,6 +9,7 @@ PowerShell toolkit for automated debugging and GPU profiling on Windows. Designe
 | Script | Purpose |
 |--------|---------|
 | `windbg-attach.ps1` | Attach cdb.exe to a process, run commands, capture stack traces |
+| `windbg-break.ps1` | Set breakpoints, capture state at each hit, step through code |
 | `vs-attach.ps1` | Launch Visual Studio attached to a process (interactive) |
 | `chromium-debug.ps1` | Launch Chromium with startup dialogs, auto-attach debugger to gpu/renderer/browser process |
 
@@ -40,6 +41,12 @@ PowerShell toolkit for automated debugging and GPU profiling on Windows. Designe
 
 # Launch a test under the debugger (no race condition)
 .\src\vs\windbg-attach.ps1 -Executable "C:\dawn\out\Debug\dawn_end2end_tests.exe" -Arguments "--gtest_filter=*Buffer*" -WorkingDirectory "C:\dawn\out\Debug"
+
+# Set a breakpoint and capture stack + locals at the hit
+.\src\vs\windbg-break.ps1 -Executable "C:\dawn\out\Debug\dawn_end2end_tests.exe" -Breakpoints "dawn_end2end_tests!main" -OnHit full
+
+# Step through code at a breakpoint (20 steps, step-into)
+.\src\vs\windbg-break.ps1 -Executable "C:\tests\test.exe" -Breakpoints "test!Render" -OnHit step -StepCount 20 -StepMode into
 
 # Capture a screenshot of a window
 .\src\util\screenshot.ps1 -ProcessId <pid> -OutputPath capture.png

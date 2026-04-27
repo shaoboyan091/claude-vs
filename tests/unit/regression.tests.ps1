@@ -108,6 +108,23 @@ Describe "Regression tests for bug fixes" {
         }
     }
 
+    Context "BUG-034: windbg-break uses bu and BP_HIT markers" {
+        It "Uses bu for deferred breakpoints" {
+            $content = Get-Content "$PSScriptRoot/../../src/vs/windbg-break.ps1" -Raw
+            $content | Should Match '\bbu\b'
+        }
+
+        It "Uses ==BP_HIT== markers for output parsing" {
+            $content = Get-Content "$PSScriptRoot/../../src/vs/windbg-break.ps1" -Raw
+            $content | Should Match '==BP_HIT=='
+        }
+
+        It "Uses ReadToEndAsync for async reads" {
+            $content = Get-Content "$PSScriptRoot/../../src/vs/windbg-break.ps1" -Raw
+            $content | Should Match 'ReadToEndAsync'
+        }
+    }
+
     Context "All scripts parse without errors" {
         $allScripts = Get-ChildItem "$PSScriptRoot/../../src" -Filter *.ps1 -Recurse
 

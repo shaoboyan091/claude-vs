@@ -97,3 +97,40 @@ g                           # continue
 | "Debugger already attached" | Only one debugger per process; detach first |
 | Managed (.NET) code in stack | Load SOS: `.loadby sos clr` then `!clrstack` |
 | Process exits on attach | Use `-pd` flag (non-invasive attach) |
+
+## Scripted Breakpoint Debugging
+
+For automated breakpoint sessions with structured output, use `windbg-break.ps1`.
+
+### Set breakpoints and capture state
+
+```powershell
+# Full state (stack + locals + registers) at a single breakpoint
+.\src\vs\windbg-break.ps1 -Executable "C:\tests\test.exe" -Breakpoints "test!main" -OnHit full
+
+# Multiple breakpoints, capture only stack traces
+.\src\vs\windbg-break.ps1 -ProcessId 1234 -Breakpoints "module!FuncA","module!FuncB" -OnHit stack -MaxHits 3
+```
+
+### Step through code at a breakpoint
+
+```powershell
+# Step over 10 instructions after hitting breakpoint
+.\src\vs\windbg-break.ps1 -Executable "C:\tests\test.exe" -Breakpoints "test!Render" -OnHit step -StepCount 10
+
+# Step into (follow calls) for 20 steps
+.\src\vs\windbg-break.ps1 -Executable "C:\tests\test.exe" -Breakpoints "test!Render" -OnHit step -StepCount 20 -StepMode into
+```
+
+### OnHit actions
+
+| Action | Captured |
+|--------|----------|
+| `stack` | Call stack (`k`) |
+| `locals` | Call stack + local variables (`k;dv /t`) |
+| `full` | Call stack + locals + registers (`k;dv /t;r`) |
+| `step` | Locals at hit, then N single-step snapshots |
+
+### Output format
+
+Returns JSON with `breakpoints[]`, each containing `hits[]` with `stack`, `locals`, `registers`, and `steps[]` fields.
