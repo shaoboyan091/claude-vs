@@ -9,7 +9,7 @@
       "properties": {
         "Duration": { "type": "integer", "description": "Collection duration in seconds" },
         "OutputPath": { "type": "string", "description": "Output file path" },
-        "Features": { "type": "array", "items": { "type": "string" }, "description": "Features to collect (e.g. cpu-cstate, gpu-cstate, freq, power)" },
+        "Features": { "type": "string", "description": "Features to collect (e.g. cpu-cstate, gpu-cstate, freq, power)" },
         "RunElevated": { "type": "boolean", "description": "Run with elevated privileges" }
       },
       "required": ["Duration"]

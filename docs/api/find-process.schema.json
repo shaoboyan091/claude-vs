@@ -13,7 +13,7 @@
         },
         "Type": {
           "type": "string",
-          "enum": ["browser", "renderer", "gpu", "utility", "all"],
+          "enum": ["browser", "renderer", "gpu", "utility", "gpu-process", "crashpad-handler"],
           "description": "Chromium process type filter"
         },
         "ChromePath": {

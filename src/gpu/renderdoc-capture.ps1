@@ -181,23 +181,18 @@ try {
 
         $argList = @("capture", "-w")
 
-        if ($CaptureFrame -ge 0) {
-            $argList += "--capture-frame"
-            $argList += $CaptureFrame.ToString()
-        }
+        $argList += "-c"
+        $argList += "`"$OutputPath`""
 
         if ($CaptureDelay -gt 0) {
-            $argList += "--capture-delay"
+            $argList += "--opt-delay-for-debugger"
             $argList += $CaptureDelay.ToString()
         }
 
-        $argList += "-c"
-        $argList += "`"$OutputPath`""
-        $argList += "-e"
+        # Executable is a positional arg (not -e), must come after all options
         $argList += "`"$Executable`""
 
         if ($Arguments) {
-            $argList += "--"
             $argList += $Arguments
         }
 

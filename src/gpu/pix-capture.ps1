@@ -101,11 +101,6 @@ try {
     }
 
     # PIX programmatic capture via DLL injection
-    # Set environment variables before launching the process
-    $env:PIX_CAPTURE_ON_CONNECT = "1"
-    $env:PIX_NUMBER_OF_FRAMES = $CaptureFrames.ToString()
-    $env:PIX_CAPTURE_FILE = $OutputPath
-
     # The key mechanism: loading WinPixGpuCapturer.dll into the process
     # This is done by adding the DLL directory to the DLL search path
     $pixDir = Split-Path -Parent $pixDll
@@ -120,6 +115,8 @@ try {
     }
     $psi.Arguments = $effectiveArgs
     $psi.UseShellExecute = $false
+    $psi.RedirectStandardOutput = $true
+    $psi.RedirectStandardError = $true
     $psi.EnvironmentVariables["PIX_CAPTURE_ON_CONNECT"] = "1"
     $psi.EnvironmentVariables["PIX_NUMBER_OF_FRAMES"] = $CaptureFrames.ToString()
     $psi.EnvironmentVariables["PIX_CAPTURE_FILE"] = $OutputPath
@@ -131,16 +128,18 @@ try {
 
     $process = [System.Diagnostics.Process]::Start($psi)
 
+    # Start async reads before WaitForExit to avoid deadlock
+    $stdoutTask = $process.StandardOutput.ReadToEndAsync()
+    $stderrTask = $process.StandardError.ReadToEndAsync()
+
     # Wait for capture
     $exited = $process.WaitForExit($Timeout * 1000)
     if (-not $exited) {
         $process.Kill()
     }
 
-    # Clean up env vars
-    Remove-Item env:PIX_CAPTURE_ON_CONNECT -ErrorAction SilentlyContinue
-    Remove-Item env:PIX_NUMBER_OF_FRAMES -ErrorAction SilentlyContinue
-    Remove-Item env:PIX_CAPTURE_FILE -ErrorAction SilentlyContinue
+    $stdout = $stdoutTask.Result
+    $stderr = $stderrTask.Result
 
     $captureExists = Test-Path $OutputPath
 
@@ -151,10 +150,16 @@ try {
         captureExists = $captureExists
         pixDll       = $pixDll
         frames       = $CaptureFrames
-        note         = if ($captureExists) { "Capture saved" } else { "Capture file not found. Ensure the app uses D3D12 and Developer Mode is enabled." }
+        stdout       = $stdout
+        stderr       = $stderr
+        note         = $(if ($captureExists) { "Capture saved" } else { "Capture file not found. Ensure the app uses D3D12 and Developer Mode is enabled." })
     })
 
 } catch {
     Write-Error "PIX capture failed: $_"
     exit 1
+} finally {
+    Remove-Item env:PIX_CAPTURE_ON_CONNECT -ErrorAction SilentlyContinue
+    Remove-Item env:PIX_NUMBER_OF_FRAMES -ErrorAction SilentlyContinue
+    Remove-Item env:PIX_CAPTURE_FILE -ErrorAction SilentlyContinue
 }

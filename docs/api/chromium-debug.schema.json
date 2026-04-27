@@ -9,9 +9,9 @@
       "properties": {
         "ChromePath": { "type": "string", "description": "Path to Chrome/Chromium executable" },
         "Target": { "type": "string", "enum": ["browser", "gpu", "renderer"], "description": "Which process type to debug" },
-        "Debugger": { "type": "string", "enum": ["cdb", "vs", "windbg"], "description": "Debugger to use" },
+        "Debugger": { "type": "string", "enum": ["windbg", "vs"], "description": "Debugger to use" },
         "Url": { "type": "string", "description": "URL to navigate to" },
-        "ExtraArgs": { "type": "string", "description": "Extra Chrome command-line arguments" },
+        "ExtraArgs": { "type": "array", "items": { "type": "string" }, "description": "Extra Chrome command-line arguments" },
         "CdbCommands": { "type": "string", "description": "CDB commands to run on attach" },
         "OutputLog": { "type": "string", "description": "Path to debugger output log" }
       }

@@ -9,7 +9,8 @@
       "properties": {
         "Executable": { "type": "string", "description": "Executable to capture from" },
         "OutputPath": { "type": "string", "description": "Output .wpix file path" },
-        "CaptureFrames": { "type": "string", "description": "Frame range to capture (e.g. 1-5)" },
+        "CaptureFrames": { "type": "integer", "description": "Number of frames to capture" },
+        "Timeout": { "type": "integer", "description": "Timeout in seconds" },
         "PixInstallDir": { "type": "string", "description": "PIX installation directory" },
         "Arguments": { "type": "string", "description": "Arguments for the executable" }
       }

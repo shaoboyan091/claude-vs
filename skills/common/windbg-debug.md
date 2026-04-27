@@ -27,7 +27,7 @@
 
 ```powershell
 # Interactive WinDbg
-.\scripts\windbg-attach.ps1 -PID 1234
+.\src\vs\windbg-attach.ps1 -ProcessId 1234
 
 # Non-interactive dump collection
 cdb -p 1234 -c ".dump /ma C:\dumps\crash.dmp; q"

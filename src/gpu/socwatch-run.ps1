@@ -135,23 +135,27 @@ try {
         $featureArgs += $f.Trim()
     }
 
-    $args = @(
+    $cmdArgs = @(
         "-t", $Duration.ToString()
         "-o", "`"$OutputPath`""
     ) + $featureArgs
 
     $psi = New-Object System.Diagnostics.ProcessStartInfo
     $psi.FileName = $SocWatchPath
-    $psi.Arguments = $args -join ' '
+    $psi.Arguments = $cmdArgs -join ' '
     $psi.UseShellExecute = $false
     $psi.RedirectStandardOutput = $true
     $psi.RedirectStandardError = $true
     $psi.CreateNoWindow = $true
 
-    Write-Verbose "Running: $SocWatchPath $($args -join ' ')"
+    Write-Verbose "Running: $SocWatchPath $($cmdArgs -join ' ')"
     Write-Host "Collecting for ${Duration}s..."
 
     $process = [System.Diagnostics.Process]::Start($psi)
+
+    # Start async reads before WaitForExit to avoid deadlock
+    $stdoutTask = $process.StandardOutput.ReadToEndAsync()
+    $stderrTask = $process.StandardError.ReadToEndAsync()
 
     $timeoutMs = ($Duration + 30) * 1000
     $exited = $process.WaitForExit($timeoutMs)
@@ -160,8 +164,8 @@ try {
         throw "socwatch timed out"
     }
 
-    $stdout = $process.StandardOutput.ReadToEnd()
-    $stderr = $process.StandardError.ReadToEnd()
+    $stdout = $stdoutTask.Result
+    $stderr = $stderrTask.Result
 
     # Find output CSV
     $csvFiles = Get-ChildItem "$OutputPath*" -Filter "*.csv" -ErrorAction SilentlyContinue

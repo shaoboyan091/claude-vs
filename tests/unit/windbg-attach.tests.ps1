@@ -1,12 +1,10 @@
 Describe "windbg-attach.ps1" {
 
-    BeforeAll {
-        $ScriptPath = "$PSScriptRoot/../../src/vs/windbg-attach.ps1"
-        $scriptContent = Get-Content $ScriptPath -Raw
+    $ScriptPath = "$PSScriptRoot/../../src/vs/windbg-attach.ps1"
+    $scriptContent = Get-Content $ScriptPath -Raw
 
-        $findCdbDef = [regex]::Match($scriptContent, '(?s)function Find-CdbExe \{.*?\n\}').Value
-        Invoke-Expression $findCdbDef
-    }
+    $findCdbDef = [regex]::Match($scriptContent, '(?s)function Find-CdbExe \{.*?\n\}').Value
+    Invoke-Expression $findCdbDef
 
     Context "Find-CdbExe searches expected paths" {
         It "Checks Windows SDK x64 path" {
@@ -36,20 +34,20 @@ Describe "windbg-attach.ps1" {
 
     Context "Argument construction" {
         It "Includes -p flag with PID" {
-            $scriptContent | Should Match '\$args \+= "-p"'
-            $scriptContent | Should Match '\$args \+= \$ProcessId\.ToString\(\)'
+            $scriptContent | Should Match '\$cmdArgs \+= "-p"'
+            $scriptContent | Should Match '\$cmdArgs \+= \$ProcessId\.ToString\(\)'
         }
 
         It "Includes -o flag when ChildProcesses is set" {
-            $scriptContent | Should Match 'if \(\$ChildProcesses\)[\s\S]*?\$args \+= "-o"'
+            $scriptContent | Should Match 'if \(\$ChildProcesses\)[\s\S]*?\$cmdArgs \+= "-o"'
         }
 
         It "Includes -c flag with commands" {
-            $scriptContent | Should Match '\$args \+= "-c"'
+            $scriptContent | Should Match '\$cmdArgs \+= "-c"'
         }
 
         It "Includes -loga flag when OutputLog specified" {
-            $scriptContent | Should Match '\$args \+= "-loga"'
+            $scriptContent | Should Match '\$cmdArgs \+= "-loga"'
         }
     }
 
@@ -74,9 +72,7 @@ Describe "windbg-attach.ps1" {
     }
 
     Context "Process execution (mocked)" {
-        BeforeAll {
-            $fakePid = 9999
-        }
+        $fakePid = 9999
 
         It "Requires mandatory Pid parameter" {
             $cmd = Get-Command $ScriptPath

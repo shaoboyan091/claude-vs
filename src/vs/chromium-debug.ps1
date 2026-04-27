@@ -74,6 +74,7 @@ function Wait-ForChromeProcess {
     throw "Timed out waiting for Chrome '$ProcessType' process"
 }
 
+$debugSuccess = $false
 try {
     if (-not (Test-Path $ChromePath)) {
         throw "Chrome not found at: $ChromePath"
@@ -121,7 +122,7 @@ try {
     switch ($Debugger) {
         "windbg" {
             $attachArgs = @{
-                Pid = $targetPid
+                ProcessId = $targetPid
             }
             if ($CdbCommands) { $attachArgs.Commands = $CdbCommands }
             if ($OutputLog) { $attachArgs.OutputLog = $OutputLog }
@@ -135,6 +136,8 @@ try {
         }
     }
 
+    $debugSuccess = $true
+
     Write-Output (ConvertTo-Json @{
         success       = $true
         chromePid     = $chromeProc.Id
@@ -147,4 +150,10 @@ try {
 } catch {
     Write-Error "Chromium debug failed: $_"
     exit 1
+} finally {
+    # Only kill Chrome if the debugger failed to attach;
+    # on success the user wants Chrome to keep running
+    if (-not $debugSuccess -and $chromeProc -and -not $chromeProc.HasExited) {
+        try { $chromeProc.Kill() } catch { }
+    }
 }

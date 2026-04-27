@@ -7,7 +7,7 @@
     "input": {
       "type": "object",
       "properties": {
-        "Pid": { "type": "integer", "description": "Target process ID" },
+        "ProcessId": { "type": "integer", "description": "Target process ID" },
         "CommandFile": { "type": "string", "description": "Path to debugger command script file" },
         "Commands": { "type": "string", "description": "Inline debugger commands (semicolon-separated)" },
         "ChildProcesses": { "type": "boolean", "description": "Debug child processes" },
@@ -15,7 +15,7 @@
         "CdbPath": { "type": "string", "description": "Path to cdb.exe" },
         "Timeout": { "type": "integer", "description": "Timeout in seconds" }
       },
-      "required": ["Pid"]
+      "required": ["ProcessId"]
     },
     "output": {
       "type": "object",

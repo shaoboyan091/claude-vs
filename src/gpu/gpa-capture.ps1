@@ -77,7 +77,7 @@ try {
     }
 
     # Build arguments
-    $args = @(
+    $cmdArgs = @(
         "--injection-mode", "1"
         "-t", "`"$Executable`""
         "-L", "capture"
@@ -93,14 +93,14 @@ try {
     }
     switch ($Api) {
         "d3d12" {
-            $args += "--hook-d3d11on12"
+            $cmdArgs += "--hook-d3d11on12"
             # For Chromium WebGPU: enable Dawn D3D12 backend
             if ($Executable -match 'chrome') {
                 $extraChromeArgs += " --enable-unsafe-webgpu --use-angle=d3d11"
             }
         }
         "vulkan" {
-            $args += "--hook-vulkan"
+            $cmdArgs += "--hook-vulkan"
             if ($Executable -match 'chrome') {
                 $extraChromeArgs += " --use-vulkan --enable-features=Vulkan"
             }
@@ -108,20 +108,24 @@ try {
     }
 
     if ($extraChromeArgs.Trim()) {
-        $args += "--"
-        $args += $extraChromeArgs.Trim()
+        $cmdArgs += "--"
+        $cmdArgs += $extraChromeArgs.Trim()
     }
 
     $psi = New-Object System.Diagnostics.ProcessStartInfo
     $psi.FileName = $GpaPath
-    $psi.Arguments = $args -join ' '
+    $psi.Arguments = $cmdArgs -join ' '
     $psi.UseShellExecute = $false
     $psi.RedirectStandardOutput = $true
     $psi.RedirectStandardError = $true
     $psi.CreateNoWindow = $true
 
-    Write-Verbose "Running: $GpaPath $($args -join ' ')"
+    Write-Verbose "Running: $GpaPath $($cmdArgs -join ' ')"
     $process = [System.Diagnostics.Process]::Start($psi)
+
+    # Start async reads before sleep/kill to avoid deadlock
+    $stdoutTask = $process.StandardOutput.ReadToEndAsync()
+    $stderrTask = $process.StandardError.ReadToEndAsync()
 
     # Let it capture for Duration seconds, then signal stop
     Start-Sleep -Seconds $Duration
@@ -130,14 +134,14 @@ try {
         $process.Kill()
     }
 
-    $stdout = $process.StandardOutput.ReadToEnd()
-    $stderr = $process.StandardError.ReadToEnd()
+    $stdout = $stdoutTask.Result
+    $stderr = $stderrTask.Result
 
     # Find capture files
     $captures = Get-ChildItem $OutputDir -Recurse -File -ErrorAction SilentlyContinue
 
     Write-Output (ConvertTo-Json @{
-        success    = $true
+        success    = ($process.ExitCode -eq 0)
         api        = $Api
         executable = $Executable
         outputDir  = $OutputDir

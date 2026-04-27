@@ -1,8 +1,6 @@
 Describe "find-process.ps1" {
 
-    BeforeAll {
-        $ScriptPath = "$PSScriptRoot/../../src/util/find-process.ps1"
-    }
+    $ScriptPath = "$PSScriptRoot/../../src/util/find-process.ps1"
 
     Context "Parameter validation" {
         It "Has default ProcessName of 'chrome'" {
@@ -31,11 +29,9 @@ Describe "find-process.ps1" {
     }
 
     Context "Get-ChromeProcessType logic" {
-        BeforeAll {
-            $scriptContent = Get-Content $ScriptPath -Raw
-            $functionDef = [regex]::Match($scriptContent, '(?s)function Get-ChromeProcessType \{.*?\n\}').Value
-            Invoke-Expression $functionDef
-        }
+        $scriptContent = Get-Content $ScriptPath -Raw
+        $functionDef = [regex]::Match($scriptContent, '(?s)function Get-ChromeProcessType \{.*?\n\}').Value
+        Invoke-Expression $functionDef
 
         It "Returns 'browser' for null/empty command line" {
             Get-ChromeProcessType -CommandLine "" | Should Be "browser"
@@ -61,8 +57,7 @@ Describe "find-process.ps1" {
     }
 
     Context "Process filtering with mocked Get-CimInstance" {
-        BeforeAll {
-            $mockProcesses = @(
+        $mockProcesses = @(
                 [PSCustomObject]@{
                     ProcessId       = 1000
                     Name            = "chrome.exe"
@@ -85,7 +80,6 @@ Describe "find-process.ps1" {
                     ParentProcessId = 1000
                 }
             )
-        }
 
         It "Returns all processes when no Type filter" {
             Mock Get-CimInstance { $mockProcesses }

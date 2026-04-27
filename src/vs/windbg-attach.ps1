@@ -88,12 +88,12 @@ try {
     $proc = Get-Process -Id $ProcessId -ErrorAction Stop
 
     # Build argument list
-    $args = @()
-    $args += "-p"
-    $args += $ProcessId.ToString()
+    $cmdArgs = @()
+    $cmdArgs += "-p"
+    $cmdArgs += $ProcessId.ToString()
 
     if ($ChildProcesses) {
-        $args += "-o"
+        $cmdArgs += "-o"
     }
 
     if ($OutputLog) {
@@ -101,8 +101,8 @@ try {
         if ($logDir -and -not (Test-Path $logDir)) {
             New-Item -ItemType Directory -Path $logDir -Force | Out-Null
         }
-        $args += "-loga"
-        $args += $OutputLog
+        $cmdArgs += "-loga"
+        $cmdArgs += $OutputLog
     }
 
     # Build commands to execute
@@ -123,14 +123,14 @@ try {
         $cmdString = "~*k;.detach;q"
     }
 
-    $args += "-c"
-    $args += "`"$cmdString`""
+    $cmdArgs += "-c"
+    $cmdArgs += "`"$cmdString`""
 
-    Write-Verbose "Running: $CdbPath $($args -join ' ')"
+    Write-Verbose "Running: $CdbPath $($cmdArgs -join ' ')"
 
     $psi = New-Object System.Diagnostics.ProcessStartInfo
     $psi.FileName = $CdbPath
-    $psi.Arguments = $args -join ' '
+    $psi.Arguments = $cmdArgs -join ' '
     $psi.UseShellExecute = $false
     $psi.RedirectStandardOutput = $true
     $psi.RedirectStandardError = $true

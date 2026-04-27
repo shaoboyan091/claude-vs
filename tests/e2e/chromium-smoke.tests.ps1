@@ -1,9 +1,7 @@
 Describe "Chromium E2E smoke tests" -Tag "E2E" {
 
-    BeforeAll {
-        $SrcRoot = "$PSScriptRoot/../../src"
-        $RunE2E = $env:CLAUDE_VS_E2E -eq "1"
-    }
+    $SrcRoot = "$PSScriptRoot/../../src"
+    $RunE2E = $env:CLAUDE_VS_E2E -eq "1"
 
     Context "find-process finds Chrome processes" {
         It "Discovers running Chrome browser process" {
@@ -56,8 +54,10 @@ Describe "Chromium E2E smoke tests" -Tag "E2E" {
             # RenderDoc may or may not produce .rdc depending on timing, but it should not crash
             ($result.stdout -ne $null) | Should Be $true
 
-            # Cleanup
-            Stop-Process -Name chrome -Force -ErrorAction SilentlyContinue
+            # Cleanup: stop the Chrome instance we launched by PID
+            if ($result.chromePid) {
+                Stop-Process -Id $result.chromePid -Force -ErrorAction SilentlyContinue
+            }
             Start-Sleep 2
             # Re-launch Chrome for subsequent tests
             Start-Process $chromePath -ArgumentList "https://webglsamples.org/aquarium/aquarium.html"

@@ -33,6 +33,7 @@ param(
 $ErrorActionPreference = "Stop"
 
 Add-Type -AssemblyName System.Drawing
+Add-Type -AssemblyName System.Windows.Forms
 
 $win32 = Add-Type -MemberDefinition @'
 [DllImport("user32.dll")]

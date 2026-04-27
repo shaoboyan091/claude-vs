@@ -1,14 +1,10 @@
 Describe "screenshot.ps1" {
 
-    BeforeAll {
-        $ScriptPath = "$PSScriptRoot/../../src/util/screenshot.ps1"
-        $scriptContent = Get-Content $ScriptPath -Raw
-    }
+    $ScriptPath = "$PSScriptRoot/../../src/util/screenshot.ps1"
+    $scriptContent = Get-Content $ScriptPath -Raw
 
     Context "Parameter set validation" {
-        BeforeAll {
-            $cmd = Get-Command $ScriptPath
-        }
+        $cmd = Get-Command $ScriptPath
 
         It "Has ByPid parameter set with Pid parameter" {
             ($cmd.ParameterSets.Name -contains "ByPid") | Should Be $true

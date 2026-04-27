@@ -16,22 +16,19 @@
 ### 1. Capture by PID
 
 ```powershell
-.\scripts\screenshot-capture.ps1 -PID 1234 -Output "C:\captures\window.png"
+.\src\util\screenshot.ps1 -ProcessId 1234 -OutputPath "C:\captures\window.png"
 ```
 
 ### 2. Capture by window title
 
 ```powershell
-.\scripts\screenshot-capture.ps1 -Title "WebGL Aquarium" -Output "C:\captures\aquarium.png"
+.\src\util\screenshot.ps1 -Title "WebGL Aquarium" -OutputPath "C:\captures\aquarium.png"
 ```
 
 ### 3. Capture fullscreen (entire display)
 
 ```powershell
-.\scripts\screenshot-capture.ps1 -Fullscreen -Output "C:\captures\desktop.png"
-
-# Specific monitor
-.\scripts\screenshot-capture.ps1 -Fullscreen -Monitor 1 -Output "C:\captures\monitor1.png"
+.\src\util\screenshot.ps1 -Fullscreen -OutputPath "C:\captures\desktop.png"
 ```
 
 ### 4. Inline PowerShell (no script dependency)
@@ -49,17 +46,11 @@ $bmp.Save("C:\captures\screen.png")
 $gfx.Dispose(); $bmp.Dispose()
 ```
 
-### 5. Capture with delay (wait for render)
-
-```powershell
-.\scripts\screenshot-capture.ps1 -Title "Chrome" -Delay 3 -Output "C:\captures\chrome.png"
-```
-
-### 6. Batch capture (multiple windows)
+### 5. Batch capture (multiple windows)
 
 ```powershell
 Get-Process chrome | Where-Object { $_.MainWindowTitle } | ForEach-Object {
-    .\scripts\screenshot-capture.ps1 -PID $_.Id -Output "C:\captures\chrome_$($_.Id).png"
+    .\src\util\screenshot.ps1 -ProcessId $_.Id -OutputPath "C:\captures\chrome_$($_.Id).png"
 }
 ```
 
@@ -74,5 +65,5 @@ Get-Process chrome | Where-Object { $_.MainWindowTitle } | ForEach-Object {
 |-------|-----|
 | "Window not found" | Verify PID/title; window may be minimized |
 | Black screenshot | Window may be occluded or using DWM composition; try `-Fullscreen` |
-| DPI scaling issues | Add `-DpiAware` flag or set process DPI awareness |
+| DPI scaling issues | Set process DPI awareness before capture |
 | Minimized window | Restore window first: `Show-Window -PID 1234` |

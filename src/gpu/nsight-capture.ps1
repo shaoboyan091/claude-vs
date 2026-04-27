@@ -99,7 +99,7 @@ try {
         "GPUTrace"      { "GPU Trace" }
     }
 
-    $args = @(
+    $cmdArgs = @(
         "--activity", "`"$activityName`""
         "--exe", "`"$Executable`""
     )
@@ -110,29 +110,29 @@ try {
             Write-Warning "Chrome detected: auto-adding --disable-gpu-sandbox --disable-gpu-watchdog for Nsight capture"
             $Arguments = "$Arguments --disable-gpu-sandbox --disable-gpu-watchdog".Trim()
         }
-        $args += "--args"
-        $args += "`"$Arguments`""
+        $cmdArgs += "--args"
+        $cmdArgs += "`"$Arguments`""
     } elseif ($Executable -match 'chrome') {
         Write-Warning "Chrome detected: auto-adding --disable-gpu-sandbox --disable-gpu-watchdog for Nsight capture"
-        $args += "--args"
-        $args += "`"--disable-gpu-sandbox --disable-gpu-watchdog`""
+        $cmdArgs += "--args"
+        $cmdArgs += "`"--disable-gpu-sandbox --disable-gpu-watchdog`""
     }
 
-    $args += "--output"
-    $args += "`"$OutputPath`""
+    $cmdArgs += "--output"
+    $cmdArgs += "`"$OutputPath`""
 
-    $args += "--frame"
-    $args += $CaptureFrame.ToString()
+    $cmdArgs += "--frame"
+    $cmdArgs += $CaptureFrame.ToString()
 
     $psi = New-Object System.Diagnostics.ProcessStartInfo
     $psi.FileName = $NgfxPath
-    $psi.Arguments = $args -join ' '
+    $psi.Arguments = $cmdArgs -join ' '
     $psi.UseShellExecute = $false
     $psi.RedirectStandardOutput = $true
     $psi.RedirectStandardError = $true
     $psi.CreateNoWindow = $true
 
-    Write-Verbose "Running: $NgfxPath $($args -join ' ')"
+    Write-Verbose "Running: $NgfxPath $($cmdArgs -join ' ')"
     $process = [System.Diagnostics.Process]::Start($psi)
 
     $stdoutTask = $process.StandardOutput.ReadToEndAsync()

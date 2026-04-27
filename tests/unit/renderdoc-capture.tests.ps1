@@ -1,12 +1,10 @@
 Describe "renderdoc-capture.ps1" {
 
-    BeforeAll {
-        $ScriptPath = "$PSScriptRoot/../../src/gpu/renderdoc-capture.ps1"
-        $scriptContent = Get-Content $ScriptPath -Raw
+    $ScriptPath = "$PSScriptRoot/../../src/gpu/renderdoc-capture.ps1"
+    $scriptContent = Get-Content $ScriptPath -Raw
 
-        $findRdcDef = [regex]::Match($scriptContent, '(?s)function Find-RenderDocCmd \{.*?\n\}').Value
-        Invoke-Expression $findRdcDef
-    }
+    $findRdcDef = [regex]::Match($scriptContent, '(?s)function Find-RenderDocCmd \{.*?\n\}').Value
+    Invoke-Expression $findRdcDef
 
     Context "Find-RenderDocCmd searches expected paths" {
         It "Checks PATH via Get-Command" {

@@ -54,7 +54,17 @@ function Get-ChromeProcessType {
 }
 
 try {
-    $filter = "Name LIKE '${ProcessName}%'"
+    # Normalize Type parameter the same way Get-ChromeProcessType does
+    $typeMap = @{
+        "gpu-process"     = "gpu"
+        "crashpad-handler" = "crashpad"
+    }
+    if ($Type -and $typeMap.ContainsKey($Type)) {
+        $Type = $typeMap[$Type]
+    }
+
+    $safeProcessName = $ProcessName -replace "'", "''"
+    $filter = "Name = '${safeProcessName}.exe' OR Name = '${safeProcessName}'"
     $processes = Get-CimInstance Win32_Process -Filter $filter -ErrorAction Stop
 
     if (-not $processes) {

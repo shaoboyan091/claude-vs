@@ -1,15 +1,11 @@
 Describe "Tool discovery" -Tag "Integration" {
 
-    BeforeAll {
-        $SrcRoot = "$PSScriptRoot/../../src"
-    }
+    $SrcRoot = "$PSScriptRoot/../../src"
 
     Context "Find-CdbExe reports clear errors when tools are missing" {
-        BeforeAll {
-            $scriptContent = Get-Content "$SrcRoot/vs/windbg-attach.ps1" -Raw
-            $funcDef = [regex]::Match($scriptContent, '(?s)function Find-CdbExe \{.*?\n\}').Value
-            Invoke-Expression $funcDef
-        }
+        $scriptContent = Get-Content "$SrcRoot/vs/windbg-attach.ps1" -Raw
+        $funcDef = [regex]::Match($scriptContent, '(?s)function Find-CdbExe \{.*?\n\}').Value
+        Invoke-Expression $funcDef
 
         It "Throws descriptive error mentioning Windows SDK or WinDbg" {
             Mock Get-Command { $null }
@@ -31,11 +27,9 @@ Describe "Tool discovery" -Tag "Integration" {
     }
 
     Context "Find-RenderDocCmd reports clear errors when tools are missing" {
-        BeforeAll {
-            $scriptContent = Get-Content "$SrcRoot/gpu/renderdoc-capture.ps1" -Raw
-            $funcDef = [regex]::Match($scriptContent, '(?s)function Find-RenderDocCmd \{.*?\n\}').Value
-            Invoke-Expression $funcDef
-        }
+        $scriptContent = Get-Content "$SrcRoot/gpu/renderdoc-capture.ps1" -Raw
+        $funcDef = [regex]::Match($scriptContent, '(?s)function Find-RenderDocCmd \{.*?\n\}').Value
+        Invoke-Expression $funcDef
 
         It "Throws descriptive error mentioning RenderDoc" {
             Mock Get-Command { $null }
