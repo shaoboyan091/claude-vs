@@ -1,0 +1,36 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "socwatch-run",
+  "description": "Run SoC Watch power and performance data collection",
+  "type": "object",
+  "properties": {
+    "input": {
+      "type": "object",
+      "properties": {
+        "Duration": { "type": "integer", "description": "Collection duration in seconds" },
+        "OutputPath": { "type": "string", "description": "Output file path" },
+        "Features": { "type": "array", "items": { "type": "string" }, "description": "Features to collect (e.g. cpu-cstate, gpu-cstate, freq, power)" },
+        "RunElevated": { "type": "boolean", "description": "Run with elevated privileges" }
+      },
+      "required": ["Duration"]
+    },
+    "output": {
+      "type": "object",
+      "properties": {
+        "success": { "type": "boolean" },
+        "duration": { "type": "integer" },
+        "features": { "type": "array", "items": { "type": "string" } },
+        "files": { "type": "array", "items": { "type": "string" } },
+        "csvSummary": { "type": "string" },
+        "summaryJson": { "type": "object" }
+      },
+      "required": ["success", "duration", "features", "files"]
+    },
+    "errors": {
+      "type": "object",
+      "properties": {
+        "1": { "const": "Collection failed" }
+      }
+    }
+  }
+}

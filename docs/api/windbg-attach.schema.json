@@ -1,0 +1,41 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "windbg-attach",
+  "description": "Attach CDB/WinDbg to a process and run debugger commands",
+  "type": "object",
+  "properties": {
+    "input": {
+      "type": "object",
+      "properties": {
+        "Pid": { "type": "integer", "description": "Target process ID" },
+        "CommandFile": { "type": "string", "description": "Path to debugger command script file" },
+        "Commands": { "type": "string", "description": "Inline debugger commands (semicolon-separated)" },
+        "ChildProcesses": { "type": "boolean", "description": "Debug child processes" },
+        "OutputLog": { "type": "string", "description": "Path to write debugger output log" },
+        "CdbPath": { "type": "string", "description": "Path to cdb.exe" },
+        "Timeout": { "type": "integer", "description": "Timeout in seconds" }
+      },
+      "required": ["Pid"]
+    },
+    "output": {
+      "type": "object",
+      "properties": {
+        "success": { "type": "boolean" },
+        "exitCode": { "type": "integer" },
+        "pid": { "type": "integer" },
+        "processName": { "type": "string" },
+        "stdout": { "type": "string" },
+        "stderr": { "type": "string" },
+        "cdbPath": { "type": "string" },
+        "logFile": { "type": "string" }
+      },
+      "required": ["success", "exitCode", "pid"]
+    },
+    "errors": {
+      "type": "object",
+      "properties": {
+        "1": { "const": "Attach failed or process not found" }
+      }
+    }
+  }
+}

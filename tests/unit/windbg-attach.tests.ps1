@@ -1,0 +1,101 @@
+Describe "windbg-attach.ps1" {
+
+    BeforeAll {
+        $ScriptPath = "$PSScriptRoot/../../src/vs/windbg-attach.ps1"
+        $scriptContent = Get-Content $ScriptPath -Raw
+
+        $findCdbDef = [regex]::Match($scriptContent, '(?s)function Find-CdbExe \{.*?\n\}').Value
+        Invoke-Expression $findCdbDef
+    }
+
+    Context "Find-CdbExe searches expected paths" {
+        It "Checks Windows SDK x64 path" {
+            $findCdbDef | Should Match 'Windows Kits\\10\\Debuggers\\x64\\cdb\.exe'
+        }
+
+        It "Checks WinDbg Preview Store app path" {
+            $findCdbDef | Should Match 'Microsoft\\WindowsApps\\cdb\.exe'
+        }
+
+        It "Checks PATH via Get-Command" {
+            $findCdbDef | Should Match 'Get-Command cdb\.exe'
+        }
+
+        It "Searches LOCALAPPDATA WinDbg directories" {
+            $findCdbDef | Should Match 'WinDbg\*'
+        }
+
+        It "Throws when cdb.exe not found anywhere" {
+            Mock Get-Command { $null } -ParameterFilter { $Name -eq 'cdb.exe' }
+            Mock Test-Path { $false }
+            Mock Get-ChildItem { @() }
+
+            { Find-CdbExe } | Should Throw "not found"
+        }
+    }
+
+    Context "Argument construction" {
+        It "Includes -p flag with PID" {
+            $scriptContent | Should Match '\$args \+= "-p"'
+            $scriptContent | Should Match '\$args \+= \$ProcessId\.ToString\(\)'
+        }
+
+        It "Includes -o flag when ChildProcesses is set" {
+            $scriptContent | Should Match 'if \(\$ChildProcesses\)[\s\S]*?\$args \+= "-o"'
+        }
+
+        It "Includes -c flag with commands" {
+            $scriptContent | Should Match '\$args \+= "-c"'
+        }
+
+        It "Includes -loga flag when OutputLog specified" {
+            $scriptContent | Should Match '\$args \+= "-loga"'
+        }
+    }
+
+    Context "Default commands when none specified" {
+        It "Uses '~*k;.detach;q' as default" {
+            $scriptContent | Should Match '~\*k;\.detach;q'
+        }
+    }
+
+    Context ".detach;q append logic" {
+        It "Appends .detach;q when missing from Commands" {
+            $scriptContent | Should Match "if \(\`$cmdString -notmatch '\\\.detach'"
+        }
+
+        It "Does not append when .detach already present" {
+            $scriptContent | Should Match '-notmatch.*\\\.detach.*-and.*-notmatch.*\\bq\\b'
+        }
+
+        It "Always appends .detach;q after CommandFile execution" {
+            $scriptContent | Should Match '\$`<\$CommandFile;\.detach;q'
+        }
+    }
+
+    Context "Process execution (mocked)" {
+        BeforeAll {
+            $fakePid = 9999
+        }
+
+        It "Requires mandatory Pid parameter" {
+            $cmd = Get-Command $ScriptPath
+            $cmd.Parameters['ProcessId'].Attributes.Where({ $_.Mandatory }) | Should Not BeNullOrEmpty
+        }
+
+        It "Verifies target process exists before attaching" {
+            $scriptContent | Should Match 'Get-Process -Id \$ProcessId -ErrorAction Stop'
+        }
+
+        It "Has default timeout of 60 seconds" {
+            $ast = [System.Management.Automation.Language.Parser]::ParseFile($ScriptPath, [ref]$null, [ref]$null)
+            $paramBlock = $ast.ParamBlock
+            $timeoutParam = $paramBlock.Parameters | Where-Object { $_.Name.VariablePath.UserPath -eq 'Timeout' }
+            $timeoutParam.DefaultValue.Value | Should Be 60
+        }
+
+        It "Kills process and throws on timeout" {
+            $scriptContent | Should Match 'if \(-not \$exited\)[\s\S]*?\$process\.Kill\(\)'
+        }
+    }
+}

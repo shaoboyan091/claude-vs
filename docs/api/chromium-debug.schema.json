@@ -1,0 +1,38 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "chromium-debug",
+  "description": "Launch or attach debugger to Chromium browser/GPU/renderer processes",
+  "type": "object",
+  "properties": {
+    "input": {
+      "type": "object",
+      "properties": {
+        "ChromePath": { "type": "string", "description": "Path to Chrome/Chromium executable" },
+        "Target": { "type": "string", "enum": ["browser", "gpu", "renderer"], "description": "Which process type to debug" },
+        "Debugger": { "type": "string", "enum": ["cdb", "vs", "windbg"], "description": "Debugger to use" },
+        "Url": { "type": "string", "description": "URL to navigate to" },
+        "ExtraArgs": { "type": "string", "description": "Extra Chrome command-line arguments" },
+        "CdbCommands": { "type": "string", "description": "CDB commands to run on attach" },
+        "OutputLog": { "type": "string", "description": "Path to debugger output log" }
+      }
+    },
+    "output": {
+      "type": "object",
+      "properties": {
+        "success": { "type": "boolean" },
+        "chromePid": { "type": "integer" },
+        "targetPid": { "type": "integer" },
+        "targetType": { "type": "string" },
+        "debugger": { "type": "string" },
+        "debuggerResult": { "type": "object" }
+      },
+      "required": ["success", "chromePid", "targetPid", "targetType", "debugger"]
+    },
+    "errors": {
+      "type": "object",
+      "properties": {
+        "1": { "const": "Debug attach or launch failed" }
+      }
+    }
+  }
+}

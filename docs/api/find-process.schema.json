@@ -1,0 +1,56 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "find-process",
+  "description": "Find processes by name, type, or Chrome path",
+  "type": "object",
+  "properties": {
+    "input": {
+      "type": "object",
+      "properties": {
+        "ProcessName": {
+          "type": "string",
+          "description": "Process name or partial match pattern"
+        },
+        "Type": {
+          "type": "string",
+          "enum": ["browser", "renderer", "gpu", "utility", "all"],
+          "description": "Chromium process type filter"
+        },
+        "ChromePath": {
+          "type": "string",
+          "description": "Path to Chrome/Chromium executable for filtering"
+        }
+      }
+    },
+    "output": {
+      "type": "object",
+      "properties": {
+        "count": {
+          "type": "integer",
+          "description": "Number of matching processes"
+        },
+        "results": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "pid": { "type": "integer" },
+              "type": { "type": "string" },
+              "cmdline": { "type": "string" },
+              "exe": { "type": "string" },
+              "parentPid": { "type": "integer" }
+            },
+            "required": ["pid", "type", "exe"]
+          }
+        }
+      },
+      "required": ["count", "results"]
+    },
+    "errors": {
+      "type": "object",
+      "properties": {
+        "1": { "const": "No processes found matching criteria" }
+      }
+    }
+  }
+}

@@ -1,0 +1,36 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "gpa-capture",
+  "description": "Capture graphics frames using Intel GPA",
+  "type": "object",
+  "properties": {
+    "input": {
+      "type": "object",
+      "properties": {
+        "Executable": { "type": "string", "description": "Executable to capture from" },
+        "Api": { "type": "string", "enum": ["d3d11", "d3d12", "vulkan"], "description": "Graphics API to hook" },
+        "OutputDir": { "type": "string", "description": "Directory for capture output" },
+        "ChromeArgs": { "type": "string", "description": "Chrome-specific arguments" },
+        "Duration": { "type": "integer", "description": "Capture duration in seconds" }
+      }
+    },
+    "output": {
+      "type": "object",
+      "properties": {
+        "success": { "type": "boolean" },
+        "api": { "type": "string" },
+        "outputDir": { "type": "string" },
+        "captures": { "type": "array", "items": { "type": "string" } },
+        "stdout": { "type": "string" },
+        "stderr": { "type": "string" }
+      },
+      "required": ["success", "api", "outputDir", "captures"]
+    },
+    "errors": {
+      "type": "object",
+      "properties": {
+        "1": { "const": "Capture failed" }
+      }
+    }
+  }
+}

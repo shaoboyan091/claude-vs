@@ -1,0 +1,36 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "nsight-capture",
+  "description": "Capture GPU activity using NVIDIA Nsight Graphics",
+  "type": "object",
+  "properties": {
+    "input": {
+      "type": "object",
+      "properties": {
+        "Executable": { "type": "string", "description": "Executable to capture from" },
+        "Activity": { "type": "string", "enum": ["frame", "trace", "gpu-trace"], "description": "Capture activity type" },
+        "OutputPath": { "type": "string", "description": "Output file path" },
+        "Arguments": { "type": "string", "description": "Arguments for the executable" },
+        "CaptureFrame": { "type": "integer", "description": "Frame number to capture" }
+      }
+    },
+    "output": {
+      "type": "object",
+      "properties": {
+        "success": { "type": "boolean" },
+        "activity": { "type": "string" },
+        "outputPath": { "type": "string" },
+        "outputFiles": { "type": "array", "items": { "type": "string" } },
+        "stdout": { "type": "string" },
+        "stderr": { "type": "string" }
+      },
+      "required": ["success", "activity", "outputPath"]
+    },
+    "errors": {
+      "type": "object",
+      "properties": {
+        "1": { "const": "Capture failed" }
+      }
+    }
+  }
+}

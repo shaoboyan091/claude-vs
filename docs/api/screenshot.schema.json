@@ -1,0 +1,46 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "screenshot",
+  "description": "Capture a screenshot of a window or full screen",
+  "type": "object",
+  "properties": {
+    "input": {
+      "type": "object",
+      "properties": {
+        "Pid": {
+          "type": "integer",
+          "description": "Process ID of the target window"
+        },
+        "Title": {
+          "type": "string",
+          "description": "Window title match pattern"
+        },
+        "FullScreen": {
+          "type": "boolean",
+          "description": "Capture entire screen instead of a window"
+        },
+        "OutputPath": {
+          "type": "string",
+          "description": "File path for the output image"
+        }
+      }
+    },
+    "output": {
+      "type": "object",
+      "properties": {
+        "success": { "type": "boolean" },
+        "path": { "type": "string" },
+        "width": { "type": "integer" },
+        "height": { "type": "integer" },
+        "method": { "type": "string", "description": "Capture method used (e.g. BitBlt, PrintWindow)" }
+      },
+      "required": ["success", "path", "width", "height", "method"]
+    },
+    "errors": {
+      "type": "object",
+      "properties": {
+        "1": { "const": "Capture failed" }
+      }
+    }
+  }
+}

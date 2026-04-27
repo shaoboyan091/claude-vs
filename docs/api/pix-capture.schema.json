@@ -1,0 +1,35 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "pix-capture",
+  "description": "Capture GPU frames using PIX",
+  "type": "object",
+  "properties": {
+    "input": {
+      "type": "object",
+      "properties": {
+        "Executable": { "type": "string", "description": "Executable to capture from" },
+        "OutputPath": { "type": "string", "description": "Output .wpix file path" },
+        "CaptureFrames": { "type": "string", "description": "Frame range to capture (e.g. 1-5)" },
+        "PixInstallDir": { "type": "string", "description": "PIX installation directory" },
+        "Arguments": { "type": "string", "description": "Arguments for the executable" }
+      }
+    },
+    "output": {
+      "type": "object",
+      "properties": {
+        "success": { "type": "boolean" },
+        "outputPath": { "type": "string" },
+        "captureExists": { "type": "boolean" },
+        "pixDll": { "type": "string" },
+        "frames": { "type": "integer" }
+      },
+      "required": ["success", "outputPath", "captureExists"]
+    },
+    "errors": {
+      "type": "object",
+      "properties": {
+        "1": { "const": "Capture failed" }
+      }
+    }
+  }
+}
