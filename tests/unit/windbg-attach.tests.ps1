@@ -74,9 +74,19 @@ Describe "windbg-attach.ps1" {
     Context "Process execution (mocked)" {
         $fakePid = 9999
 
-        It "Requires mandatory Pid parameter" {
+        It "Has ProcessId parameter for attach mode" {
             $cmd = Get-Command $ScriptPath
-            $cmd.Parameters['ProcessId'].Attributes.Where({ $_.Mandatory }) | Should Not BeNullOrEmpty
+            $cmd.Parameters['ProcessId'] | Should Not BeNullOrEmpty
+        }
+
+        It "Has Executable parameter for launch mode" {
+            $cmd = Get-Command $ScriptPath
+            $cmd.Parameters['Executable'] | Should Not BeNullOrEmpty
+        }
+
+        It "Has WorkingDirectory parameter for launch mode" {
+            $cmd = Get-Command $ScriptPath
+            $cmd.Parameters['WorkingDirectory'] | Should Not BeNullOrEmpty
         }
 
         It "Verifies target process exists before attaching" {
@@ -92,6 +102,29 @@ Describe "windbg-attach.ps1" {
 
         It "Kills process and throws on timeout" {
             $scriptContent | Should Match 'if \(-not \$exited\)[\s\S]*?\$process\.Kill\(\)'
+        }
+    }
+
+    Context "Launch mode (run executable under debugger)" {
+        It "Uses -g -G flags for launch mode" {
+            $scriptContent | Should Match '\$cmdArgs \+= "-g"'
+            $scriptContent | Should Match '\$cmdArgs \+= "-G"'
+        }
+
+        It "Puts executable at end of argument list" {
+            $scriptContent | Should Match '\$cmdArgs \+= \$Executable'
+        }
+
+        It "Sets WorkingDirectory on ProcessStartInfo" {
+            $scriptContent | Should Match '\$psi\.WorkingDirectory = \$WorkingDirectory'
+        }
+
+        It "Requires either ProcessId or Executable" {
+            $scriptContent | Should Match 'Must specify either -ProcessId.*or -Executable'
+        }
+
+        It "Uses q instead of .detach;q in launch mode defaults" {
+            $scriptContent | Should Match '\$cmdString = "~\*k;q"'
         }
     }
 }

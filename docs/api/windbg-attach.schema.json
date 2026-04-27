@@ -1,13 +1,16 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
   "title": "windbg-attach",
-  "description": "Attach CDB/WinDbg to a process and run debugger commands",
+  "description": "Attach CDB/WinDbg to a process or launch an executable under the debugger",
   "type": "object",
   "properties": {
     "input": {
       "type": "object",
       "properties": {
-        "ProcessId": { "type": "integer", "description": "Target process ID" },
+        "ProcessId": { "type": "integer", "description": "Target process ID (attach mode)" },
+        "Executable": { "type": "string", "description": "Path to executable to launch under debugger (launch mode)" },
+        "Arguments": { "type": "string", "description": "Arguments for the executable (launch mode)" },
+        "WorkingDirectory": { "type": "string", "description": "Working directory for launched process (launch mode)" },
         "CommandFile": { "type": "string", "description": "Path to debugger command script file" },
         "Commands": { "type": "string", "description": "Inline debugger commands (semicolon-separated)" },
         "ChildProcesses": { "type": "boolean", "description": "Debug child processes" },
@@ -15,26 +18,31 @@
         "CdbPath": { "type": "string", "description": "Path to cdb.exe" },
         "Timeout": { "type": "integer", "description": "Timeout in seconds" }
       },
-      "required": ["ProcessId"]
+      "oneOf": [
+        { "required": ["ProcessId"] },
+        { "required": ["Executable"] }
+      ]
     },
     "output": {
       "type": "object",
       "properties": {
         "success": { "type": "boolean" },
         "exitCode": { "type": "integer" },
-        "pid": { "type": "integer" },
-        "processName": { "type": "string" },
+        "mode": { "type": "string", "enum": ["attach", "launch"] },
+        "pid": { "type": "integer", "description": "Attach mode only" },
+        "processName": { "type": "string", "description": "Attach mode only" },
+        "executable": { "type": "string", "description": "Launch mode only" },
         "stdout": { "type": "string" },
         "stderr": { "type": "string" },
         "cdbPath": { "type": "string" },
         "logFile": { "type": "string" }
       },
-      "required": ["success", "exitCode", "pid"]
+      "required": ["success", "exitCode", "mode"]
     },
     "errors": {
       "type": "object",
       "properties": {
-        "1": { "const": "Attach failed or process not found" }
+        "1": { "const": "Attach/launch failed or process not found" }
       }
     }
   }

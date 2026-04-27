@@ -17,17 +17,23 @@
 ### 1. Find the target process
 
 ```powershell
-# By name
-.\scripts\find-process.ps1 -Name "chrome"
-# By window title
-.\scripts\find-process.ps1 -Title "GPU Process"
+.\src\util\find-process.ps1 -ProcessName "chrome" -Type gpu
 ```
 
-### 2. Attach debugger
+### 2a. Attach debugger to running process
 
 ```powershell
-# Interactive WinDbg
 .\src\vs\windbg-attach.ps1 -ProcessId 1234
+
+# With custom commands
+.\src\vs\windbg-attach.ps1 -ProcessId 1234 -Commands "!analyze -v;~*k;.detach;q"
+```
+
+### 2b. Launch executable under debugger (for tests)
+
+```powershell
+# Run a test under the debugger — no race condition
+.\src\vs\windbg-attach.ps1 -Executable "C:\dawn\out\Debug\dawn_end2end_tests.exe" -Arguments "--gtest_filter=*Buffer*" -WorkingDirectory "C:\dawn\out\Debug"
 
 # Non-interactive dump collection
 cdb -p 1234 -c ".dump /ma C:\dumps\crash.dmp; q"

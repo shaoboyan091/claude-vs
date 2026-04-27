@@ -1,11 +1,21 @@
 <#
 .SYNOPSIS
-    Attach WinDbg/cdb to a process for automated debugging.
+    Attach WinDbg/cdb to a running process, or launch an executable under the debugger.
 .DESCRIPTION
     Wraps cdb.exe (console WinDbg) for headless debug sessions.
-    Supports command files, child process debugging, and log output.
-.PARAMETER Pid
-    Process ID to attach to.
+    Two modes:
+      Attach mode: -ProcessId <pid> attaches to an existing process.
+      Launch mode:  -Executable <path> starts the program under the debugger.
+    Launch mode solves the race condition where short-lived processes (tests)
+    exit before a separate attach can reach them.
+.PARAMETER ProcessId
+    Process ID to attach to (attach mode).
+.PARAMETER Executable
+    Path to executable to launch under the debugger (launch mode).
+.PARAMETER Arguments
+    Arguments to pass to the executable (launch mode only).
+.PARAMETER WorkingDirectory
+    Working directory for the launched process (launch mode only).
 .PARAMETER CommandFile
     Path to a cdb command script to execute after attach.
 .PARAMETER Commands
@@ -19,13 +29,23 @@
 .PARAMETER Timeout
     Max seconds to wait for cdb session (default: 60).
 .EXAMPLE
-    .\windbg-attach.ps1 -Pid 1234 -Commands "k;~*k;.detach;q"
-    .\windbg-attach.ps1 -Pid 1234 -CommandFile "C:\scripts\dump-stacks.txt" -OutputLog "C:\tmp\debug.log"
+    .\windbg-attach.ps1 -ProcessId 1234 -Commands "k;~*k;.detach;q"
+    .\windbg-attach.ps1 -Executable "C:\tests\my_test.exe" -Arguments "--gtest_filter=Foo*" -Commands "~*k;q"
+    .\windbg-attach.ps1 -Executable "C:\dawn\out\Debug\dawn_end2end_tests.exe" -WorkingDirectory "C:\dawn\out\Debug" -Arguments "--gtest_filter=BufferTests.*"
 #>
 [CmdletBinding()]
 param(
-    [Parameter(Mandatory)]
-    [int]$ProcessId,
+    [Parameter()]
+    [int]$ProcessId = 0,
+
+    [Parameter()]
+    [string]$Executable = "",
+
+    [Parameter()]
+    [string]$Arguments = "",
+
+    [Parameter()]
+    [string]$WorkingDirectory = "",
 
     [Parameter()]
     [string]$CommandFile = "",
@@ -84,13 +104,32 @@ try {
         throw "cdb.exe not found at: $CdbPath"
     }
 
-    # Verify target process exists
-    $proc = Get-Process -Id $ProcessId -ErrorAction Stop
+    # Determine mode: launch or attach
+    $launchMode = $false
+    if ($Executable) {
+        if (-not (Test-Path $Executable)) {
+            throw "Executable not found: $Executable"
+        }
+        $launchMode = $true
+    } elseif ($ProcessId -gt 0) {
+        # Verify target process exists
+        $proc = Get-Process -Id $ProcessId -ErrorAction Stop
+    } else {
+        throw "Must specify either -ProcessId (attach mode) or -Executable (launch mode)"
+    }
 
     # Build argument list
     $cmdArgs = @()
-    $cmdArgs += "-p"
-    $cmdArgs += $ProcessId.ToString()
+
+    if ($launchMode) {
+        # Launch mode: -g (skip initial break) -G (skip final break)
+        $cmdArgs += "-g"
+        $cmdArgs += "-G"
+    } else {
+        # Attach mode
+        $cmdArgs += "-p"
+        $cmdArgs += $ProcessId.ToString()
+    }
 
     if ($ChildProcesses) {
         $cmdArgs += "-o"
@@ -111,20 +150,42 @@ try {
         if (-not (Test-Path $CommandFile)) {
             throw "Command file not found: $CommandFile"
         }
-        $cmdString = "`$`<$CommandFile;.detach;q"
+        if ($launchMode) {
+            $cmdString = "`$`<$CommandFile;q"
+        } else {
+            $cmdString = "`$`<$CommandFile;.detach;q"
+        }
     } elseif ($Commands) {
         $cmdString = "$Commands"
-        # Ensure session ends cleanly
-        if ($cmdString -notmatch '\.detach' -and $cmdString -notmatch '\bq\b') {
-            $cmdString += ";.detach;q"
+        if ($launchMode) {
+            if ($cmdString -notmatch '\bq\b') {
+                $cmdString += ";q"
+            }
+        } else {
+            if ($cmdString -notmatch '\.detach' -and $cmdString -notmatch '\bq\b') {
+                $cmdString += ";.detach;q"
+            }
         }
     } else {
-        # Default: dump all thread stacks, detach, quit
-        $cmdString = "~*k;.detach;q"
+        if ($launchMode) {
+            # Default for launch: dump stacks after program finishes, then quit
+            $cmdString = "~*k;q"
+        } else {
+            # Default for attach: dump all thread stacks, detach, quit
+            $cmdString = "~*k;.detach;q"
+        }
     }
 
     $cmdArgs += "-c"
     $cmdArgs += "`"$cmdString`""
+
+    # In launch mode, executable and its arguments come last
+    if ($launchMode) {
+        $cmdArgs += $Executable
+        if ($Arguments) {
+            $cmdArgs += $Arguments
+        }
+    }
 
     Write-Verbose "Running: $CdbPath $($cmdArgs -join ' ')"
 
@@ -135,6 +196,10 @@ try {
     $psi.RedirectStandardOutput = $true
     $psi.RedirectStandardError = $true
     $psi.CreateNoWindow = $true
+
+    if ($launchMode -and $WorkingDirectory) {
+        $psi.WorkingDirectory = $WorkingDirectory
+    }
 
     $process = [System.Diagnostics.Process]::Start($psi)
 
@@ -153,11 +218,17 @@ try {
     $output = @{
         success    = ($process.ExitCode -eq 0)
         exitCode   = $process.ExitCode
-        pid        = $ProcessId
-        processName = $proc.ProcessName
+        mode       = $(if ($launchMode) { "launch" } else { "attach" })
         stdout     = $stdout
         stderr     = $stderr
         cdbPath    = $CdbPath
+    }
+
+    if ($launchMode) {
+        $output.executable = $Executable
+    } else {
+        $output.pid = $ProcessId
+        $output.processName = $proc.ProcessName
     }
 
     if ($OutputLog) {

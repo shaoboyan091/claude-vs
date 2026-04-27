@@ -33,21 +33,17 @@ Describe "renderdoc-capture.ps1" {
             $scriptContent | Should Match '\$argList = @\("capture", "-w"\)'
         }
 
-        It "Adds --capture-frame when CaptureFrame >= 0" {
-            $scriptContent | Should Match '--capture-frame'
-        }
-
-        It "Adds --capture-delay when CaptureDelay > 0" {
-            $scriptContent | Should Match '--capture-delay'
-        }
-
-        It "Uses -c for output path and -e for executable" {
+        It "Uses -c for output path" {
             $scriptContent | Should Match '\$argList \+= "-c"'
-            $scriptContent | Should Match '\$argList \+= "-e"'
         }
 
-        It "Passes extra arguments after -- separator" {
-            $scriptContent | Should Match '\$argList \+= "--"'
+        It "Executable is positional argument (no -e flag)" {
+            $scriptContent | Should Not Match '\$argList \+= "-e"'
+            $scriptContent | Should Match '\$argList \+= "`"\$Executable`""'
+        }
+
+        It "Uses --opt-delay-for-debugger for delays" {
+            $scriptContent | Should Match '--opt-delay-for-debugger'
         }
     }
 

@@ -38,6 +38,9 @@ PowerShell toolkit for automated debugging and GPU profiling on Windows. Designe
 # Attach WinDbg, dump all thread stacks, detach
 .\src\vs\windbg-attach.ps1 -ProcessId <pid>
 
+# Launch a test under the debugger (no race condition)
+.\src\vs\windbg-attach.ps1 -Executable "C:\dawn\out\Debug\dawn_end2end_tests.exe" -Arguments "--gtest_filter=*Buffer*" -WorkingDirectory "C:\dawn\out\Debug"
+
 # Capture a screenshot of a window
 .\src\util\screenshot.ps1 -ProcessId <pid> -OutputPath capture.png
 
