@@ -123,6 +123,32 @@ Describe "Regression tests for bug fixes" {
             $content = Get-Content "$PSScriptRoot/../../src/vs/windbg-break.ps1" -Raw
             $content | Should Match 'ReadToEndAsync'
         }
+
+        It "Uses command file instead of nested -c quotes" {
+            $content = Get-Content "$PSScriptRoot/../../src/vs/windbg-break.ps1" -Raw
+            $content | Should Match 'GetTempFileName'
+            $content | Should Match '\$<'
+        }
+
+        It "Uses -G flag in launch mode" {
+            $content = Get-Content "$PSScriptRoot/../../src/vs/windbg-break.ps1" -Raw
+            $content | Should Match '"-G"'
+        }
+
+        It "Uses .detach in attach mode" {
+            $content = Get-Content "$PSScriptRoot/../../src/vs/windbg-break.ps1" -Raw
+            $content | Should Match '\.detach;q'
+        }
+
+        It "Uses pseudo-register for hit counting" {
+            $content = Get-Content "$PSScriptRoot/../../src/vs/windbg-break.ps1" -Raw
+            $content | Should Match '\$t0'
+        }
+
+        It "Handles exceptions with sxd" {
+            $content = Get-Content "$PSScriptRoot/../../src/vs/windbg-break.ps1" -Raw
+            $content | Should Match 'sxd \*'
+        }
     }
 
     Context "All scripts parse without errors" {

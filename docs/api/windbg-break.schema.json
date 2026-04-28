@@ -22,6 +22,8 @@
         "OnHit": { "type": "string", "enum": ["stack", "locals", "full", "step"], "default": "full", "description": "Action at each breakpoint hit" },
         "StepCount": { "type": "integer", "default": 10, "description": "Number of steps when OnHit=step" },
         "StepMode": { "type": "string", "enum": ["over", "into"], "default": "over", "description": "Step over (p) or step into (t)" },
+        "SymbolPath": { "type": "string", "description": "Additional symbol path (e.g. build output directory)" },
+        "PreCommands": { "type": "string", "description": "Extra cdb commands to run before breakpoints (semicolon-separated)" },
         "OutputLog": { "type": "string", "description": "Path to write debugger output log" },
         "CdbPath": { "type": "string", "description": "Path to cdb.exe" },
         "Timeout": { "type": "integer", "default": 120, "description": "Timeout in seconds" }

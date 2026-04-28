@@ -8,6 +8,9 @@
       Attach mode: -ProcessId <pid> attaches to an existing process.
       Launch mode:  -Executable <path> starts the program under the debugger.
     Output is structured JSON with per-breakpoint hit data.
+
+    Commands are written to a temp script file and executed via cdb's $< command
+    to avoid nested quoting issues with -c.
 .PARAMETER Executable
     Path to executable to launch under the debugger (launch mode).
 .PARAMETER ProcessId
@@ -19,7 +22,8 @@
 .PARAMETER Breakpoints
     Breakpoint locations as string array (e.g. "module!Function", "module!Class::Method").
 .PARAMETER BreakOnEntry
-    If set, do not skip the initial debugger breakpoint.
+    If set, do not skip the initial debugger breakpoint. Pre-commands and symbol
+    setup run at the initial break before continuing.
 .PARAMETER MaxHits
     Maximum breakpoint hits before quitting (default: 1).
 .PARAMETER OnHit
@@ -28,6 +32,10 @@
     Number of steps when OnHit=step (default: 10).
 .PARAMETER StepMode
     Step mode: over (p command) or into (t command) (default: over).
+.PARAMETER SymbolPath
+    Additional symbol path to add (e.g. build output directory).
+.PARAMETER PreCommands
+    Extra cdb commands to run before setting breakpoints (semicolon-separated).
 .PARAMETER OutputLog
     Path to write cdb session log.
 .PARAMETER CdbPath
@@ -54,12 +62,14 @@ param(
     [string]$WorkingDirectory = "",
 
     [Parameter(Mandatory=$true)]
+    [ValidateNotNullOrEmpty()]
     [string[]]$Breakpoints,
 
     [Parameter()]
     [switch]$BreakOnEntry,
 
     [Parameter()]
+    [ValidateRange(1, 10000)]
     [int]$MaxHits = 1,
 
     [Parameter()]
@@ -67,11 +77,18 @@ param(
     [string]$OnHit = "full",
 
     [Parameter()]
+    [ValidateRange(1, 1000)]
     [int]$StepCount = 10,
 
     [Parameter()]
     [ValidateSet("over", "into")]
     [string]$StepMode = "over",
+
+    [Parameter()]
+    [string]$SymbolPath = "",
+
+    [Parameter()]
+    [string]$PreCommands = "",
 
     [Parameter()]
     [string]$OutputLog = "",
@@ -80,6 +97,7 @@ param(
     [string]$CdbPath = "",
 
     [Parameter()]
+    [ValidateRange(1, 3600)]
     [int]$Timeout = 120
 )
 
@@ -132,71 +150,150 @@ function Build-BreakpointAction {
     }
 }
 
+function Build-CommandFile {
+    param(
+        [string]$TempPath,
+        [string[]]$BpLocations,
+        [string]$Action,
+        [int]$Steps,
+        [string]$StepCmd,
+        [int]$MaxHitCount,
+        [bool]$IsAttachMode,
+        [string]$SymPath,
+        [string]$PreCmds
+    )
+
+    $lines = @()
+
+    $lines += "sxd *"
+    $lines += "sxe epr"
+
+    if ($SymPath) {
+        $lines += ".sympath+ $SymPath"
+        $lines += ".reload"
+    }
+
+    if ($PreCmds) {
+        $lines += $PreCmds
+    }
+
+    $lines += "r `$t0 = 0"
+
+    foreach ($bp in $BpLocations) {
+        $actionCmds = Build-BreakpointAction -Location $bp -Action $Action -Steps $Steps -StepCmd $StepCmd
+
+        if ($IsAttachMode) {
+            $quitCmd = ".detach;q"
+        } else {
+            $quitCmd = "q"
+        }
+
+        $buBody = "r `$t0 = @`$t0 + 1; .if (@`$t0 >= $MaxHitCount) { $actionCmds;$quitCmd } .else { $actionCmds;gc }"
+        $lines += "bu $bp `"$buBody`""
+    }
+
+    $lines += "g"
+
+    $lines | Out-File -FilePath $TempPath -Encoding ascii
+}
+
 function Parse-BreakpointOutput {
     param([string]$RawOutput, [string[]]$Locations)
 
     $results = @()
+    $markerPattern = '==BP_HIT==(.+?)=='
+    $allMatches = [regex]::Matches($RawOutput, $markerPattern)
+
+    $hitsByLocation = @{}
     foreach ($loc in $Locations) {
-        $entry = @{
+        $hitsByLocation[$loc] = @{
             location = $loc
             hitCount = 0
             hits     = @()
         }
+    }
 
-        $pattern = [regex]::Escape("==BP_HIT==${loc}==")
-        $segments = [regex]::Split($RawOutput, $pattern)
+    for ($m = 0; $m -lt $allMatches.Count; $m++) {
+        $match = $allMatches[$m]
+        $loc = $match.Groups[1].Value
+        $startIdx = $match.Index + $match.Length
 
-        for ($i = 1; $i -lt $segments.Count; $i++) {
-            $entry.hitCount++
-            $segment = $segments[$i]
-
-            $hit = @{
-                stack     = ""
-                locals    = ""
-                registers = ""
-                steps     = @()
-            }
-
-            $stepParts = [regex]::Split($segment, '==STEP==(\d+)==')
-            $mainPart = $stepParts[0]
-
-            $lines = $mainPart -split "`n"
-            $stackLines = @()
-            $localLines = @()
-            $regLines = @()
-            $section = "stack"
-            foreach ($line in $lines) {
-                $trimmed = $line.Trim()
-                if ($trimmed -match '^\s*\w+\s+=') {
-                    $section = "locals"
-                }
-                if ($trimmed -match '^[a-z]{2,3}=') {
-                    $section = "registers"
-                }
-                switch ($section) {
-                    "stack"     { $stackLines += $line }
-                    "locals"    { $localLines += $line }
-                    "registers" { $regLines += $line }
-                }
-            }
-            $hit.stack = ($stackLines -join "`n").Trim()
-            $hit.locals = ($localLines -join "`n").Trim()
-            $hit.registers = ($regLines -join "`n").Trim()
-
-            for ($s = 1; $s -lt $stepParts.Count; $s += 2) {
-                $stepNum = [int]$stepParts[$s]
-                $stepContent = if (($s + 1) -lt $stepParts.Count) { $stepParts[$s + 1] } else { "" }
-                $hit.steps += @{
-                    step    = $stepNum
-                    instruction = ($stepContent -split "`n")[0].Trim()
-                    stack   = ""
-                    locals  = ""
-                }
-            }
-
-            $entry.hits += $hit
+        if (($m + 1) -lt $allMatches.Count) {
+            $endIdx = $allMatches[$m + 1].Index
+        } else {
+            $endIdx = $RawOutput.Length
         }
-        $results += $entry
+
+        $segment = $RawOutput.Substring($startIdx, $endIdx - $startIdx)
+
+        if (-not $hitsByLocation.ContainsKey($loc)) {
+            continue
+        }
+
+        $entry = $hitsByLocation[$loc]
+        $entry.hitCount++
+
+        $hit = @{
+            stack     = ""
+            locals    = ""
+            registers = ""
+            steps     = @()
+        }
+
+        $stepParts = [regex]::Split($segment, '==STEP==(\d+)==')
+        $mainPart = $stepParts[0]
+
+        $lines = $mainPart -split "`n"
+        $stackLines = @()
+        $localLines = @()
+        $regLines = @()
+        $section = "stack"
+        foreach ($line in $lines) {
+            $trimmed = $line.Trim()
+            if ($trimmed -match '^\s*\w+\s+=') {
+                $section = "locals"
+            }
+            if ($trimmed -match '^[a-z]{2,3}=') {
+                $section = "registers"
+            }
+            switch ($section) {
+                "stack"     { $stackLines += $line }
+                "locals"    { $localLines += $line }
+                "registers" { $regLines += $line }
+            }
+        }
+        $hit.stack = ($stackLines -join "`n").Trim()
+        $hit.locals = ($localLines -join "`n").Trim()
+        $hit.registers = ($regLines -join "`n").Trim()
+
+        for ($s = 1; $s -lt $stepParts.Count; $s += 2) {
+            $stepNum = [int]$stepParts[$s]
+            $stepContent = if (($s + 1) -lt $stepParts.Count) { $stepParts[$s + 1] } else { "" }
+            $stepLines = $stepContent -split "`n"
+            $sStack = @()
+            $sLocals = @()
+            $sSec = "stack"
+            foreach ($sl in $stepLines) {
+                $st = $sl.Trim()
+                if ($st -match '^\s*\w+\s+=') { $sSec = "locals" }
+                switch ($sSec) {
+                    "stack"  { $sStack += $sl }
+                    "locals" { $sLocals += $sl }
+                }
+            }
+            $hit.steps += @{
+                step        = $stepNum
+                instruction = ($stepLines | Where-Object { $_.Trim() } | Select-Object -First 1).Trim()
+                stack       = ($sStack -join "`n").Trim()
+                locals      = ($sLocals -join "`n").Trim()
+            }
+        }
+
+        $entry.hits += $hit
+    }
+
+    foreach ($loc in $Locations) {
+        $results += $hitsByLocation[$loc]
     }
     return $results
 }
@@ -227,94 +324,106 @@ try {
 
     $stepCmd = if ($StepMode -eq "into") { "t" } else { "p" }
 
-    $buCommands = @()
-    foreach ($bp in $Breakpoints) {
-        $action = Build-BreakpointAction -Location $bp -Action $OnHit -Steps $StepCount -StepCmd $stepCmd
-        $buCommands += "bu $bp `"${action};gc`""
-    }
+    $tempFile = [System.IO.Path]::GetTempFileName()
+    try {
+        Build-CommandFile -TempPath $tempFile `
+            -BpLocations $Breakpoints `
+            -Action $OnHit `
+            -Steps $StepCount `
+            -StepCmd $stepCmd `
+            -MaxHitCount $MaxHits `
+            -IsAttachMode (-not $launchMode) `
+            -SymPath $SymbolPath `
+            -PreCmds $PreCommands
 
-    $cmdString = ($buCommands -join ";") + ";g"
+        $cmdArgs = @()
 
-    $cmdArgs = @()
-
-    if ($launchMode) {
-        if (-not $BreakOnEntry) {
-            $cmdArgs += "-g"
+        if ($launchMode) {
+            if (-not $BreakOnEntry) {
+                $cmdArgs += "-g"
+            }
+            $cmdArgs += "-G"
+        } else {
+            $cmdArgs += "-p"
+            $cmdArgs += $ProcessId.ToString()
         }
-    } else {
-        $cmdArgs += "-p"
-        $cmdArgs += $ProcessId.ToString()
-    }
 
-    if ($OutputLog) {
-        $logDir = Split-Path -Parent $OutputLog
-        if ($logDir -and -not (Test-Path $logDir)) {
-            New-Item -ItemType Directory -Path $logDir -Force | Out-Null
+        if ($OutputLog) {
+            $logDir = Split-Path -Parent $OutputLog
+            if ($logDir -and -not (Test-Path $logDir)) {
+                New-Item -ItemType Directory -Path $logDir -Force | Out-Null
+            }
+            $cmdArgs += "-loga"
+            $cmdArgs += $OutputLog
         }
-        $cmdArgs += "-loga"
-        $cmdArgs += $OutputLog
-    }
 
-    $cmdArgs += "-c"
-    $cmdArgs += "`"$cmdString`""
+        $cmdArgs += "-c"
+        $cmdArgs += "`"`$<$tempFile`""
 
-    if ($launchMode) {
-        $cmdArgs += $Executable
-        if ($Arguments) {
-            $cmdArgs += $Arguments
+        if ($launchMode) {
+            $cmdArgs += $Executable
+            if ($Arguments) {
+                $cmdArgs += $Arguments
+            }
+        }
+
+        Write-Verbose "Running: $CdbPath $($cmdArgs -join ' ')"
+        Write-Verbose "Command file: $tempFile"
+
+        $psi = New-Object System.Diagnostics.ProcessStartInfo
+        $psi.FileName = $CdbPath
+        $psi.Arguments = $cmdArgs -join ' '
+        $psi.UseShellExecute = $false
+        $psi.RedirectStandardOutput = $true
+        $psi.RedirectStandardError = $true
+        $psi.CreateNoWindow = $true
+
+        if ($launchMode -and $WorkingDirectory) {
+            $psi.WorkingDirectory = $WorkingDirectory
+        }
+
+        $process = [System.Diagnostics.Process]::Start($psi)
+
+        $stdoutTask = $process.StandardOutput.ReadToEndAsync()
+        $stderrTask = $process.StandardError.ReadToEndAsync()
+
+        $exited = $process.WaitForExit($Timeout * 1000)
+        if (-not $exited) {
+            $process.Kill()
+            throw "cdb session timed out after ${Timeout}s"
+        }
+
+        $stdout = $stdoutTask.Result
+        $stderr = $stderrTask.Result
+
+        $bpResults = Parse-BreakpointOutput -RawOutput $stdout -Locations $Breakpoints
+
+        $output = @{
+            success     = ($process.ExitCode -eq 0)
+            mode        = $(if ($launchMode) { "launch" } else { "attach" })
+            breakpoints = $bpResults
+            stdout      = $stdout
+            stderr      = $stderr
+        }
+
+        if ($launchMode) {
+            $output.executable = $Executable
+        } else {
+            $output.pid = $ProcessId
+            $output.processName = $proc.ProcessName
+        }
+
+        if ($OutputLog) {
+            $output.logFile = $OutputLog
+        }
+
+        Write-Output (ConvertTo-Json $output -Depth 5)
+
+    } finally {
+        if (Test-Path $tempFile) {
+            Remove-Item $tempFile -Force -ErrorAction SilentlyContinue
         }
     }
-
-    Write-Verbose "Running: $CdbPath $($cmdArgs -join ' ')"
-
-    $psi = New-Object System.Diagnostics.ProcessStartInfo
-    $psi.FileName = $CdbPath
-    $psi.Arguments = $cmdArgs -join ' '
-    $psi.UseShellExecute = $false
-    $psi.RedirectStandardOutput = $true
-    $psi.RedirectStandardError = $true
-    $psi.CreateNoWindow = $true
-
-    if ($launchMode -and $WorkingDirectory) {
-        $psi.WorkingDirectory = $WorkingDirectory
-    }
-
-    $process = [System.Diagnostics.Process]::Start($psi)
-
-    $stdoutTask = $process.StandardOutput.ReadToEndAsync()
-    $stderrTask = $process.StandardError.ReadToEndAsync()
-
-    $exited = $process.WaitForExit($Timeout * 1000)
-    if (-not $exited) {
-        $process.Kill()
-        throw "cdb session timed out after ${Timeout}s"
-    }
-
-    $stdout = $stdoutTask.Result
-    $stderr = $stderrTask.Result
-
-    $bpResults = Parse-BreakpointOutput -RawOutput $stdout -Locations $Breakpoints
-
-    $output = @{
-        success     = ($process.ExitCode -eq 0)
-        mode        = $(if ($launchMode) { "launch" } else { "attach" })
-        breakpoints = $bpResults
-        stdout      = $stdout
-        stderr      = $stderr
-    }
-
-    if ($launchMode) {
-        $output.executable = $Executable
-    } else {
-        $output.pid = $ProcessId
-        $output.processName = $proc.ProcessName
-    }
-
-    if ($OutputLog) {
-        $output.logFile = $OutputLog
-    }
-
-    Write-Output (ConvertTo-Json $output -Depth 5)
 
 } catch {
     Write-Error "WinDbg breakpoint debug failed: $_"

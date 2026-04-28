@@ -57,6 +57,53 @@ Describe "windbg-break.ps1" {
         It "Has ProcessId parameter for attach mode" {
             $cmd.Parameters['ProcessId'] | Should Not BeNullOrEmpty
         }
+
+        It "Has SymbolPath parameter" {
+            $cmd.Parameters['SymbolPath'] | Should Not BeNullOrEmpty
+        }
+
+        It "Has PreCommands parameter" {
+            $cmd.Parameters['PreCommands'] | Should Not BeNullOrEmpty
+        }
+
+        It "Has ValidateRange on MaxHits" {
+            $attrs = $cmd.Parameters['MaxHits'].Attributes | Where-Object { $_ -is [System.Management.Automation.ValidateRangeAttribute] }
+            $attrs | Should Not BeNullOrEmpty
+        }
+
+        It "Has ValidateRange on StepCount" {
+            $attrs = $cmd.Parameters['StepCount'].Attributes | Where-Object { $_ -is [System.Management.Automation.ValidateRangeAttribute] }
+            $attrs | Should Not BeNullOrEmpty
+        }
+
+        It "Has ValidateRange on Timeout" {
+            $attrs = $cmd.Parameters['Timeout'].Attributes | Where-Object { $_ -is [System.Management.Automation.ValidateRangeAttribute] }
+            $attrs | Should Not BeNullOrEmpty
+        }
+
+        It "Has ValidateNotNullOrEmpty on Breakpoints" {
+            $attrs = $cmd.Parameters['Breakpoints'].Attributes | Where-Object { $_ -is [System.Management.Automation.ValidateNotNullOrEmptyAttribute] }
+            $attrs | Should Not BeNullOrEmpty
+        }
+    }
+
+    Context "Command file approach" {
+        It "Uses temp file via GetTempFileName" {
+            $scriptContent | Should Match 'GetTempFileName'
+        }
+
+        It "Uses dollar-less-than for command file execution" {
+            $scriptContent | Should Match '\$<'
+        }
+
+        It "Cleans up temp file in finally block" {
+            $scriptContent | Should Match 'finally'
+            $scriptContent | Should Match 'Remove-Item \$tempFile'
+        }
+
+        It "Has Build-CommandFile function" {
+            $scriptContent | Should Match 'function Build-CommandFile'
+        }
     }
 
     Context "Breakpoint command construction" {
@@ -73,7 +120,21 @@ Describe "windbg-break.ps1" {
         }
 
         It "Appends g command to start execution" {
-            $scriptContent | Should Match '\+ ";g"'
+            $scriptContent | Should Match '\+= "g"'
+        }
+    }
+
+    Context "MaxHits via pseudo-register counter" {
+        It "Initializes counter register t0" {
+            $scriptContent | Should Match 'r \`\$t0 = 0'
+        }
+
+        It "Increments counter on each hit" {
+            $scriptContent | Should Match 'r \`\$t0 = @\`\$t0 \+ 1'
+        }
+
+        It "Uses .if to check hit count against MaxHits" {
+            $scriptContent | Should Match '\.if \(@\`\$t0 >='
         }
     }
 
@@ -107,6 +168,30 @@ Describe "windbg-break.ps1" {
         }
     }
 
+    Context "Symbol and pre-command setup" {
+        It "Supports SymbolPath with .sympath+" {
+            $scriptContent | Should Match '\.sympath\+'
+        }
+
+        It "Calls .reload after setting symbol path" {
+            $scriptContent | Should Match '\.reload'
+        }
+
+        It "Runs PreCommands before breakpoints" {
+            $scriptContent | Should Match '\$PreCmds'
+        }
+    }
+
+    Context "Exception handling" {
+        It "Disables first-chance exceptions with sxd *" {
+            $scriptContent | Should Match 'sxd \*'
+        }
+
+        It "Enables process exit event with sxe epr" {
+            $scriptContent | Should Match 'sxe epr'
+        }
+    }
+
     Context "Output parsing" {
         It "Has Parse-BreakpointOutput function" {
             $scriptContent | Should Match 'function Parse-BreakpointOutput'
@@ -122,6 +207,15 @@ Describe "windbg-break.ps1" {
 
         It "Produces JSON output with breakpoints array" {
             $scriptContent | Should Match 'breakpoints\s*=\s*\$bpResults'
+        }
+
+        It "Parses markers sequentially not per-location" {
+            $scriptContent | Should Match 'allMatches'
+        }
+
+        It "Parses per-step stack and locals" {
+            $scriptContent | Should Match 'sStack'
+            $scriptContent | Should Match 'sLocals'
         }
     }
 
@@ -148,6 +242,10 @@ Describe "windbg-break.ps1" {
             $scriptContent | Should Match '\$cmdArgs \+= "-g"'
         }
 
+        It "Uses -G flag in launch mode (skip final break)" {
+            $scriptContent | Should Match '\$cmdArgs \+= "-G"'
+        }
+
         It "Uses -p flag with PID in attach mode" {
             $scriptContent | Should Match '\$cmdArgs \+= "-p"'
         }
@@ -158,6 +256,10 @@ Describe "windbg-break.ps1" {
 
         It "Requires either ProcessId or Executable" {
             $scriptContent | Should Match 'Must specify either -ProcessId.*or -Executable'
+        }
+
+        It "Uses .detach in attach mode quit command" {
+            $scriptContent | Should Match '\.detach;q'
         }
     }
 }
