@@ -388,10 +388,11 @@ try {
         }
 
         $cmdArgs += "-c"
-        $cmdArgs += "`"$$><@`"$shortTempFile`"`""
+        $cdbCmd = "`$`$><@`"$shortTempFile`""
+        $cmdArgs += $cdbCmd
 
         if ($launchMode) {
-            $cmdArgs += $Executable
+            $cmdArgs += "`"$Executable`""
             if ($Arguments) {
                 $cmdArgs += $Arguments
             }
