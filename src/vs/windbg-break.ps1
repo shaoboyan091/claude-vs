@@ -67,9 +67,18 @@ param(
     [Parameter()]
     [string]$WorkingDirectory = "",
 
-    [Parameter(Mandatory=$true)]
+    [Parameter()]
     [ValidateNotNullOrEmpty()]
-    [string[]]$Breakpoints,
+    [string[]]$Breakpoints = @(),
+
+    [Parameter()]
+    [string[]]$SymbolModules = @(),
+
+    [Parameter()]
+    [switch]$DiscoverSymbols,
+
+    [Parameter()]
+    [switch]$ListModules,
 
     [Parameter()]
     [switch]$BreakOnEntry,
@@ -166,7 +175,8 @@ function Build-CommandFile {
         [int]$MaxHitCount,
         [bool]$IsAttachMode,
         [string]$SymPath,
-        [string]$PreCmds
+        [string]$PreCmds,
+        [string[]]$SymModules = @()
     )
 
     $lines = @()
@@ -182,7 +192,17 @@ function Build-CommandFile {
 
     if ($SymPath) {
         $lines += ".sympath+ $SymPath"
-        $lines += ".reload"
+        if ($SymModules.Count -eq 0) {
+            $lines += ".reload"
+        }
+    }
+
+    if ($SymModules.Count -gt 0) {
+        foreach ($mod in $SymModules) {
+            $lines += "ld $mod"
+            $lines += ".echo ==LD_RESULT==${mod}=="
+        }
+        $lines += ".echo ==SYMBOLS_LOADED=="
     }
 
     if ($PreCmds) {
@@ -206,11 +226,237 @@ function Build-CommandFile {
 
         $buBody = "r `$t$i = @`$t$i + 1; .if (@`$t$i >= $MaxHitCount) { $actionCmds;$quitCmd } .else { $actionCmds;gc }"
         $lines += "bu $bp `"$buBody`""
+        $lines += ".echo ==BP_SET==${bp}=="
     }
 
     $lines += "g"
 
     $lines | Out-File -FilePath $TempPath -Encoding ascii
+}
+
+function Build-DiscoveryCommandFile {
+    param(
+        [string]$TempPath,
+        [string[]]$Patterns,
+        [bool]$IsAttachMode,
+        [string]$SymPath,
+        [string[]]$SymModules = @()
+    )
+
+    $lines = @()
+    $lines += "sxd *"
+
+    if ($SymPath) {
+        $lines += ".sympath+ $SymPath"
+    }
+
+    foreach ($mod in $SymModules) {
+        $lines += "ld $mod"
+        $lines += ".echo ==LD_RESULT==${mod}=="
+    }
+    $lines += ".echo ==SYMBOLS_LOADED=="
+
+    foreach ($pat in $Patterns) {
+        $lines += ".echo ==DISCOVER==${pat}=="
+        $lines += "x $pat"
+        $lines += ".echo ==DISCOVER_END==${pat}=="
+    }
+
+    $lines += ".echo ==DISCOVER_DONE=="
+    if ($IsAttachMode) {
+        $lines += ".detach;q"
+    } else {
+        $lines += "q"
+    }
+
+    $lines | Out-File -FilePath $TempPath -Encoding ascii
+}
+
+function Build-ListModulesCommandFile {
+    param(
+        [string]$TempPath,
+        [bool]$IsAttachMode,
+        [string]$SymPath
+    )
+
+    $lines = @()
+    $lines += "sxd *"
+
+    if ($SymPath) {
+        $lines += ".sympath+ $SymPath"
+    }
+
+    $lines += ".echo ==MODULE_LIST_START=="
+    $lines += "lm"
+    $lines += ".echo ==MODULE_LIST_END=="
+
+    if ($IsAttachMode) {
+        $lines += ".detach;q"
+    } else {
+        $lines += "q"
+    }
+
+    $lines | Out-File -FilePath $TempPath -Encoding ascii
+}
+
+function Parse-SymbolDiscovery {
+    param([string]$RawOutput, [string[]]$Patterns)
+
+    $results = @{}
+    foreach ($pat in $Patterns) {
+        $results[$pat] = @()
+    }
+
+    $discoverPattern = '==DISCOVER==(.+?)=='
+    $endPattern = '==DISCOVER_END==(.+?)=='
+    $allStarts = [regex]::Matches($RawOutput, $discoverPattern)
+    $allEnds = [regex]::Matches($RawOutput, $endPattern)
+
+    for ($m = 0; $m -lt $allStarts.Count; $m++) {
+        $match = $allStarts[$m]
+        $pat = $match.Groups[1].Value
+        $startIdx = $match.Index + $match.Length
+
+        $endIdx = $RawOutput.Length
+        foreach ($em in $allEnds) {
+            if ($em.Groups[1].Value -eq $pat -and $em.Index -gt $startIdx) {
+                $endIdx = $em.Index
+                break
+            }
+        }
+        if ($endIdx -eq $RawOutput.Length) {
+            $doneIdx = $RawOutput.IndexOf('==DISCOVER_DONE==', $startIdx)
+            if ($doneIdx -ge 0) { $endIdx = $doneIdx }
+        }
+
+        $segment = $RawOutput.Substring($startIdx, $endIdx - $startIdx)
+        $symbols = @()
+
+        foreach ($line in ($segment -split "`n")) {
+            $trimmed = $line.Trim()
+            if ($trimmed -match '^[0-9a-f`]+\s+(.+)$') {
+                $symbols += $Matches[1].Trim()
+            }
+        }
+
+        if ($results.ContainsKey($pat)) {
+            $results[$pat] = $symbols
+        }
+    }
+
+    return $results
+}
+
+function Parse-ModuleList {
+    param([string]$RawOutput)
+
+    $modules = @()
+    $startMarker = '==MODULE_LIST_START=='
+    $endMarker = '==MODULE_LIST_END=='
+
+    $startIdx = $RawOutput.IndexOf($startMarker)
+    $endIdx = $RawOutput.IndexOf($endMarker)
+
+    if ($startIdx -lt 0 -or $endIdx -lt 0) {
+        return @{ modules = $modules }
+    }
+
+    $segment = $RawOutput.Substring($startIdx + $startMarker.Length, $endIdx - $startIdx - $startMarker.Length)
+
+    foreach ($line in ($segment -split "`n")) {
+        $trimmed = $line.Trim()
+        if ($trimmed -match '^([0-9a-f`]+)\s+([0-9a-f`]+)\s+(\S+)\s*(.*)$') {
+            $startAddr = $Matches[1]
+            $endAddr = $Matches[2]
+            $name = $Matches[3]
+            $path = $Matches[4].Trim()
+
+            $cleanStart = $startAddr -replace '`', ''
+            $cleanEnd = $endAddr -replace '`', ''
+            $size = 0
+            try {
+                $size = [Convert]::ToInt64($cleanEnd, 16) - [Convert]::ToInt64($cleanStart, 16)
+            } catch {}
+
+            $modules += @{
+                name  = $name
+                start = $startAddr
+                end   = $endAddr
+                size  = $size
+                path  = $path
+            }
+        }
+    }
+
+    return @{ modules = $modules }
+}
+
+function Parse-Diagnostics {
+    param([string]$RawOutput)
+
+    $diagnostics = @()
+
+    $ldPattern = '==LD_RESULT==(.+?)=='
+    $ldMatches = [regex]::Matches($RawOutput, $ldPattern)
+    foreach ($m in $ldMatches) {
+        $mod = $m.Groups[1].Value
+        $preceding = $RawOutput.Substring([Math]::Max(0, $m.Index - 500), [Math]::Min(500, $m.Index))
+
+        $status = "ok"
+        $message = "symbols loaded"
+        if ($preceding -match "Unable to (add|load) module\b") {
+            $status = "error"
+            $message = "module not found in process - verify module name with -ListModules"
+        } elseif ($preceding -match "Symbols already loaded for\b") {
+            $status = "ok"
+            $message = "symbols already loaded"
+        } elseif ($preceding -match "No matching modules found\b") {
+            $status = "error"
+            $message = "no matching module found in process - verify module name with -ListModules"
+        } elseif ($preceding -match "not a valid module\b") {
+            $status = "error"
+            $message = "invalid module name"
+        } elseif ($preceding -match "DBGHELP: .+ - noass?ociated PDB") {
+            $status = "error"
+            $message = "module loaded but no PDB found - check SymbolPath includes the PDB directory"
+        }
+
+        $diagnostics += @{
+            operation = "ld"
+            target    = $mod
+            status    = $status
+            message   = $message
+        }
+    }
+
+    $bpSetPattern = '==BP_SET==(.+?)=='
+    $bpSetMatches = [regex]::Matches($RawOutput, $bpSetPattern)
+    foreach ($m in $bpSetMatches) {
+        $bp = $m.Groups[1].Value
+        $preceding = $RawOutput.Substring([Math]::Max(0, $m.Index - 500), [Math]::Min(500, $m.Index))
+
+        $status = "ok"
+        $message = "breakpoint set"
+        if ($preceding -match "Couldn.t resolve error at\b") {
+            $status = "error"
+            $message = "symbol not found - use -DiscoverSymbols to search for correct symbol name"
+        } elseif ($preceding -match "Bp expression .+ could not be resolved") {
+            $status = "error"
+            $message = "symbol could not be resolved - module may not be loaded, use -SymbolModules to load it first"
+        } elseif ($preceding -match "WARNING: Unable to verify") {
+            $status = "warning"
+            $message = "breakpoint set as deferred (unverified) - symbol may resolve when module loads at runtime"
+        }
+
+        $diagnostics += @{
+            operation = "bu"
+            target    = $bp
+            status    = $status
+            message   = $message
+        }
+    }
+
+    return $diagnostics
 }
 
 function Parse-BreakpointOutput {
@@ -322,6 +568,16 @@ try {
         throw "cdb.exe not found at: $CdbPath"
     }
 
+    if ($ListModules -and $DiscoverSymbols) {
+        throw "Cannot specify both -ListModules and -DiscoverSymbols."
+    }
+    if ($ListModules -and $Breakpoints.Count -gt 0) {
+        throw "Cannot specify -Breakpoints with -ListModules."
+    }
+    if (-not $ListModules -and -not $DiscoverSymbols -and $Breakpoints.Count -eq 0) {
+        throw "At least one breakpoint location is required (or use -ListModules / -DiscoverSymbols)"
+    }
+
     $launchMode = $false
     if ($Executable -and $ProcessId -gt 0) {
         throw "Cannot specify both -Executable and -ProcessId. Use one or the other."
@@ -340,27 +596,38 @@ try {
         throw "Must specify either -ProcessId (attach mode) or -Executable (launch mode)"
     }
 
-    if ($Breakpoints.Count -eq 0) {
-        throw "At least one breakpoint location is required"
-    }
     if ($Breakpoints.Count -gt 20) {
         throw "Maximum 20 breakpoints per session (limited by cdb pseudo-registers `$t0..`$t19)"
     }
 
     $stepCmd = if ($StepMode -eq "into") { "t" } else { "p" }
+    $isAttachMode = (-not $launchMode)
 
     $tempFile = [System.IO.Path]::GetTempFileName()
     $shortTempFile = (New-Object -ComObject Scripting.FileSystemObject).GetFile($tempFile).ShortPath
     try {
-        Build-CommandFile -TempPath $tempFile `
-            -BpLocations $Breakpoints `
-            -Action $OnHit `
-            -Steps $StepCount `
-            -StepCmd $stepCmd `
-            -MaxHitCount $MaxHits `
-            -IsAttachMode (-not $launchMode) `
-            -SymPath $SymbolPath `
-            -PreCmds $PreCommands
+        if ($ListModules) {
+            Build-ListModulesCommandFile -TempPath $tempFile `
+                -IsAttachMode $isAttachMode `
+                -SymPath $SymbolPath
+        } elseif ($DiscoverSymbols) {
+            Build-DiscoveryCommandFile -TempPath $tempFile `
+                -Patterns $Breakpoints `
+                -IsAttachMode $isAttachMode `
+                -SymPath $SymbolPath `
+                -SymModules $SymbolModules
+        } else {
+            Build-CommandFile -TempPath $tempFile `
+                -BpLocations $Breakpoints `
+                -Action $OnHit `
+                -Steps $StepCount `
+                -StepCmd $stepCmd `
+                -MaxHitCount $MaxHits `
+                -IsAttachMode $isAttachMode `
+                -SymPath $SymbolPath `
+                -PreCmds $PreCommands `
+                -SymModules $SymbolModules
+        }
 
         $cmdArgs = @()
 
@@ -427,20 +694,49 @@ try {
             } catch {
                 $process.Kill()
             }
+            $partialOutput = $stdoutTask.Result
+            $hasSymbolsLoaded = $partialOutput -match '==SYMBOLS_LOADED=='
+            if ($SymbolModules.Count -gt 0 -and -not $hasSymbolsLoaded) {
+                throw "cdb session timed out after ${Timeout}s during symbol loading - try targeting fewer/smaller modules"
+            }
             throw "cdb session timed out after ${Timeout}s"
         }
 
         $stdout = $stdoutTask.Result
         $stderr = $stderrTask.Result
+        $diag = Parse-Diagnostics -RawOutput $stdout
 
-        $bpResults = Parse-BreakpointOutput -RawOutput $stdout -Locations $Breakpoints
+        if ($ListModules) {
+            $moduleResult = Parse-ModuleList -RawOutput $stdout
+            $output = @{
+                success     = ($process.ExitCode -eq 0)
+                mode        = $(if ($launchMode) { "launch" } else { "attach" })
+                modules     = $moduleResult.modules
+                diagnostics = $diag
+                stdout      = $stdout
+                stderr      = $stderr
+            }
+        } elseif ($DiscoverSymbols) {
+            $discoveryResult = Parse-SymbolDiscovery -RawOutput $stdout -Patterns $Breakpoints
+            $output = @{
+                success     = ($process.ExitCode -eq 0)
+                mode        = $(if ($launchMode) { "launch" } else { "attach" })
+                symbols     = $discoveryResult
+                diagnostics = $diag
+                stdout      = $stdout
+                stderr      = $stderr
+            }
+        } else {
+            $bpResults = Parse-BreakpointOutput -RawOutput $stdout -Locations $Breakpoints
 
-        $output = @{
-            success     = ($process.ExitCode -eq 0)
-            mode        = $(if ($launchMode) { "launch" } else { "attach" })
-            breakpoints = $bpResults
-            stdout      = $stdout
-            stderr      = $stderr
+            $output = @{
+                success     = ($process.ExitCode -eq 0)
+                mode        = $(if ($launchMode) { "launch" } else { "attach" })
+                breakpoints = $bpResults
+                diagnostics = $diag
+                stdout      = $stdout
+                stderr      = $stderr
+            }
         }
 
         if ($launchMode) {

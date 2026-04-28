@@ -369,6 +369,8 @@ Describe "windbg-break.ps1" {
                 $content | Should Match 'r \$t1 = 0'
                 $content | Should Match 'bu mod!FuncA'
                 $content | Should Match 'bu mod!FuncB'
+                $content | Should Match '==BP_SET==mod!FuncA=='
+                $content | Should Match '==BP_SET==mod!FuncB=='
                 $content | Should Match '\ng\s*$'
             } finally {
                 Remove-Item $tmpFile -Force -ErrorAction SilentlyContinue
@@ -466,6 +468,343 @@ Describe "windbg-break.ps1" {
             {
                 & $ScriptPath -Executable "C:\fake.exe" -ProcessId 9999 -Breakpoints "main" 2>&1
             } | Should Throw
+        }
+    }
+
+    Context "New parameters" {
+        $cmd = Get-Command $ScriptPath
+
+        It "Has SymbolModules parameter as string[]" {
+            $cmd.Parameters['SymbolModules'].ParameterType.Name | Should Be 'String[]'
+        }
+
+        It "Has DiscoverSymbols switch parameter" {
+            $cmd.Parameters['DiscoverSymbols'].SwitchParameter | Should Be $true
+        }
+
+        It "Has ListModules switch parameter" {
+            $cmd.Parameters['ListModules'].SwitchParameter | Should Be $true
+        }
+    }
+
+    Context "Build-CommandFile with SymbolModules" {
+        BeforeAll {
+            $ast = [System.Management.Automation.Language.Parser]::ParseFile($ScriptPath, [ref]$null, [ref]$null)
+            $functions = $ast.FindAll({ $args[0] -is [System.Management.Automation.Language.FunctionDefinitionAst] }, $false)
+            foreach ($fn in $functions) {
+                Invoke-Expression $fn.Extent.Text
+            }
+        }
+
+        It "Generates ld commands for each module and skips .reload" {
+            $tmpFile = [System.IO.Path]::GetTempFileName()
+            try {
+                Build-CommandFile -TempPath $tmpFile `
+                    -BpLocations @("gpu_gles2!Func") `
+                    -Action "full" -Steps 10 -StepCmd "p" `
+                    -MaxHitCount 1 -IsAttachMode $true `
+                    -SymPath "C:\symbols" -PreCmds "" `
+                    -SymModules @("gpu_gles2", "chrome_child")
+                $content = Get-Content $tmpFile -Raw
+
+                $content | Should Match 'ld gpu_gles2'
+                $content | Should Match 'ld chrome_child'
+                $content | Should Match '==LD_RESULT==gpu_gles2=='
+                $content | Should Match '==LD_RESULT==chrome_child=='
+                $content | Should Match '==SYMBOLS_LOADED=='
+                $content | Should Match '\.sympath\+'
+                $content | Should Not Match '\.reload'
+            } finally {
+                Remove-Item $tmpFile -Force -ErrorAction SilentlyContinue
+            }
+        }
+
+        It "Uses .reload when no SymbolModules provided" {
+            $tmpFile = [System.IO.Path]::GetTempFileName()
+            try {
+                Build-CommandFile -TempPath $tmpFile `
+                    -BpLocations @("mod!Func") `
+                    -Action "stack" -Steps 0 -StepCmd "p" `
+                    -MaxHitCount 1 -IsAttachMode $false `
+                    -SymPath "C:\symbols" -PreCmds "" `
+                    -SymModules @()
+                $content = Get-Content $tmpFile -Raw
+
+                $content | Should Match '\.reload'
+                $content | Should Not Match '\bld\b'
+            } finally {
+                Remove-Item $tmpFile -Force -ErrorAction SilentlyContinue
+            }
+        }
+    }
+
+    Context "Build-DiscoveryCommandFile output" {
+        BeforeAll {
+            $ast = [System.Management.Automation.Language.Parser]::ParseFile($ScriptPath, [ref]$null, [ref]$null)
+            $functions = $ast.FindAll({ $args[0] -is [System.Management.Automation.Language.FunctionDefinitionAst] }, $false)
+            foreach ($fn in $functions) {
+                Invoke-Expression $fn.Extent.Text
+            }
+        }
+
+        It "Generates x commands for each pattern" {
+            $tmpFile = [System.IO.Path]::GetTempFileName()
+            try {
+                Build-DiscoveryCommandFile -TempPath $tmpFile `
+                    -Patterns @("gpu_gles2!*D3DImageBacking*", "chrome!*Render*") `
+                    -IsAttachMode $true `
+                    -SymPath "C:\symbols" `
+                    -SymModules @("gpu_gles2")
+                $content = Get-Content $tmpFile -Raw
+
+                $content | Should Match 'ld gpu_gles2'
+                $content | Should Match '==SYMBOLS_LOADED=='
+                $content | Should Match 'x gpu_gles2!\*D3DImageBacking\*'
+                $content | Should Match 'x chrome!\*Render\*'
+                $content | Should Match '==DISCOVER_DONE=='
+                $content | Should Match '\.detach;q'
+            } finally {
+                Remove-Item $tmpFile -Force -ErrorAction SilentlyContinue
+            }
+        }
+    }
+
+    Context "Build-ListModulesCommandFile output" {
+        BeforeAll {
+            $ast = [System.Management.Automation.Language.Parser]::ParseFile($ScriptPath, [ref]$null, [ref]$null)
+            $functions = $ast.FindAll({ $args[0] -is [System.Management.Automation.Language.FunctionDefinitionAst] }, $false)
+            foreach ($fn in $functions) {
+                Invoke-Expression $fn.Extent.Text
+            }
+        }
+
+        It "Generates lm command with markers" {
+            $tmpFile = [System.IO.Path]::GetTempFileName()
+            try {
+                Build-ListModulesCommandFile -TempPath $tmpFile `
+                    -IsAttachMode $true -SymPath ""
+                $content = Get-Content $tmpFile -Raw
+
+                $content | Should Match '==MODULE_LIST_START=='
+                $content | Should Match '\blm\b'
+                $content | Should Match '==MODULE_LIST_END=='
+                $content | Should Match '\.detach;q'
+            } finally {
+                Remove-Item $tmpFile -Force -ErrorAction SilentlyContinue
+            }
+        }
+    }
+
+    Context "Parse-ModuleList" {
+        BeforeAll {
+            $ast = [System.Management.Automation.Language.Parser]::ParseFile($ScriptPath, [ref]$null, [ref]$null)
+            $functions = $ast.FindAll({ $args[0] -is [System.Management.Automation.Language.FunctionDefinitionAst] }, $false)
+            foreach ($fn in $functions) {
+                Invoke-Expression $fn.Extent.Text
+            }
+        }
+
+        It "Parses lm output into module list" {
+            $raw = @"
+some preamble
+==MODULE_LIST_START==
+00007ff6`3a4b0000 00007ff6`3a4c0000   testapp    C:\test\testapp.exe
+00007ffa`12340000 00007ffa`12940000   ntdll      C:\Windows\ntdll.dll
+==MODULE_LIST_END==
+quit:
+"@
+            $result = Parse-ModuleList -RawOutput $raw
+            $result.modules.Count | Should Be 2
+            $result.modules[0].name | Should Be "testapp"
+            $result.modules[0].path | Should Match 'testapp\.exe'
+            $result.modules[1].name | Should Be "ntdll"
+            $result.modules[0].size | Should BeGreaterThan 0
+        }
+
+        It "Returns empty modules when markers missing" {
+            $result = Parse-ModuleList -RawOutput "no markers here"
+            $result.modules.Count | Should Be 0
+        }
+    }
+
+    Context "Parse-SymbolDiscovery" {
+        BeforeAll {
+            $ast = [System.Management.Automation.Language.Parser]::ParseFile($ScriptPath, [ref]$null, [ref]$null)
+            $functions = $ast.FindAll({ $args[0] -is [System.Management.Automation.Language.FunctionDefinitionAst] }, $false)
+            foreach ($fn in $functions) {
+                Invoke-Expression $fn.Extent.Text
+            }
+        }
+
+        It "Parses x command output into symbol lists" {
+            $raw = @"
+==DISCOVER==gpu!*Create*==
+00007ffa`11112222 gpu!D3DImageBacking::Create
+00007ffa`11113333 gpu!D3DImageBacking::CreateFromSharedMemory
+==DISCOVER_DONE==
+"@
+            $result = Parse-SymbolDiscovery -RawOutput $raw -Patterns @("gpu!*Create*")
+            $result["gpu!*Create*"].Count | Should Be 2
+            $result["gpu!*Create*"][0] | Should Match 'D3DImageBacking::Create'
+        }
+
+        It "Returns empty array for patterns with no matches" {
+            $raw = @"
+==DISCOVER==gpu!*NoSuchThing*==
+==DISCOVER_DONE==
+"@
+            $result = Parse-SymbolDiscovery -RawOutput $raw -Patterns @("gpu!*NoSuchThing*")
+            $result["gpu!*NoSuchThing*"].Count | Should Be 0
+        }
+    }
+
+    Context "Parameter validation for new modes" {
+        It "Script content validates ListModules and DiscoverSymbols are mutually exclusive" {
+            $scriptContent | Should Match 'Cannot specify both -ListModules and -DiscoverSymbols'
+        }
+
+        It "Script content validates ListModules rejects Breakpoints" {
+            $scriptContent | Should Match 'Cannot specify -Breakpoints with -ListModules'
+        }
+
+        It "Script content requires Breakpoints when not in discovery/list mode" {
+            $scriptContent | Should Match 'At least one breakpoint location is required'
+        }
+    }
+
+    Context "Timeout message for symbol loading" {
+        It "Script content includes symbol loading timeout message" {
+            $scriptContent | Should Match 'symbol loading.*try targeting fewer/smaller modules'
+        }
+
+        It "Script content checks for SYMBOLS_LOADED marker on timeout" {
+            $scriptContent | Should Match '==SYMBOLS_LOADED=='
+        }
+    }
+
+    Context "Parse-Diagnostics for module loading" {
+        BeforeAll {
+            $ast = [System.Management.Automation.Language.Parser]::ParseFile($ScriptPath, [ref]$null, [ref]$null)
+            $functions = $ast.FindAll({ $args[0] -is [System.Management.Automation.Language.FunctionDefinitionAst] }, $false)
+            foreach ($fn in $functions) {
+                Invoke-Expression $fn.Extent.Text
+            }
+        }
+
+        It "Detects successful module load" {
+            $raw = "Symbols loaded for gpu_gles2`n==LD_RESULT==gpu_gles2==`n"
+            $diag = @(Parse-Diagnostics -RawOutput $raw)
+            $diag.Count | Should Be 1
+            $diag[0].operation | Should Be "ld"
+            $diag[0].target | Should Be "gpu_gles2"
+            $diag[0].status | Should Be "ok"
+        }
+
+        It "Detects module not found error" {
+            $raw = "Unable to add module gpu_gles2`n==LD_RESULT==gpu_gles2==`n"
+            $diag = @(Parse-Diagnostics -RawOutput $raw)
+            $diag[0].status | Should Be "error"
+            $diag[0].message | Should Match 'module not found'
+        }
+
+        It "Detects no matching modules" {
+            $raw = "No matching modules found`n==LD_RESULT==badmod==`n"
+            $diag = @(Parse-Diagnostics -RawOutput $raw)
+            $diag[0].status | Should Be "error"
+            $diag[0].message | Should Match 'no matching module'
+        }
+
+        It "Detects missing PDB" {
+            $raw = "DBGHELP: gpu_gles2 - noassociated PDB`n==LD_RESULT==gpu_gles2==`n"
+            $diag = @(Parse-Diagnostics -RawOutput $raw)
+            $diag[0].status | Should Be "error"
+            $diag[0].message | Should Match 'no PDB found'
+        }
+    }
+
+    Context "Parse-Diagnostics for breakpoint setting" {
+        BeforeAll {
+            $ast = [System.Management.Automation.Language.Parser]::ParseFile($ScriptPath, [ref]$null, [ref]$null)
+            $functions = $ast.FindAll({ $args[0] -is [System.Management.Automation.Language.FunctionDefinitionAst] }, $false)
+            foreach ($fn in $functions) {
+                Invoke-Expression $fn.Extent.Text
+            }
+        }
+
+        It "Detects successful breakpoint set" {
+            $raw = "bu0 set at gpu!Func`n==BP_SET==gpu!Func==`n"
+            $diag = @(Parse-Diagnostics -RawOutput $raw)
+            $diag.Count | Should Be 1
+            $diag[0].operation | Should Be "bu"
+            $diag[0].status | Should Be "ok"
+        }
+
+        It "Detects unresolved symbol" {
+            $raw = "Couldn't resolve error at 'gpu!BadFunc'`n==BP_SET==gpu!BadFunc==`n"
+            $diag = @(Parse-Diagnostics -RawOutput $raw)
+            $diag[0].status | Should Be "error"
+            $diag[0].message | Should Match 'symbol not found.*DiscoverSymbols'
+        }
+
+        It "Detects unresolved expression" {
+            $raw = "Bp expression 'gpu!BadFunc' could not be resolved`n==BP_SET==gpu!BadFunc==`n"
+            $diag = @(Parse-Diagnostics -RawOutput $raw)
+            $diag[0].status | Should Be "error"
+            $diag[0].message | Should Match 'could not be resolved.*SymbolModules'
+        }
+
+        It "Detects deferred breakpoint warning" {
+            $raw = "WARNING: Unable to verify checksum for gpu_gles2.dll`n==BP_SET==gpu!Func==`n"
+            $diag = @(Parse-Diagnostics -RawOutput $raw)
+            $diag[0].status | Should Be "warning"
+            $diag[0].message | Should Match 'deferred'
+        }
+    }
+
+    Context "Parse-Diagnostics with mixed operations" {
+        BeforeAll {
+            $ast = [System.Management.Automation.Language.Parser]::ParseFile($ScriptPath, [ref]$null, [ref]$null)
+            $functions = $ast.FindAll({ $args[0] -is [System.Management.Automation.Language.FunctionDefinitionAst] }, $false)
+            foreach ($fn in $functions) {
+                Invoke-Expression $fn.Extent.Text
+            }
+        }
+
+        It "Returns diagnostics for both ld and bu operations" {
+            $raw = "Symbols loaded`n==LD_RESULT==gpu_gles2==`nCouldn't resolve error at 'gpu!Bad'`n==BP_SET==gpu!Bad==`n"
+            $diag = @(Parse-Diagnostics -RawOutput $raw)
+            $diag.Count | Should Be 2
+            $diag[0].operation | Should Be "ld"
+            $diag[1].operation | Should Be "bu"
+        }
+
+        It "Returns empty array when no diagnostic markers present" {
+            $diag = @(Parse-Diagnostics -RawOutput "some random output with no markers")
+            $diag.Count | Should Be 0
+        }
+    }
+
+    Context "Diagnostics field in output" {
+        It "Script includes diagnostics in all output paths" {
+            $scriptContent | Should Match 'diagnostics\s*=\s*\$diag'
+        }
+
+        It "Script calls Parse-Diagnostics on stdout" {
+            $scriptContent | Should Match 'Parse-Diagnostics -RawOutput \$stdout'
+        }
+    }
+
+    Context "Diagnostic markers in command files" {
+        It "Build-CommandFile includes BP_SET markers" {
+            $scriptContent | Should Match '==BP_SET=='
+        }
+
+        It "Build-CommandFile includes LD_RESULT markers" {
+            $scriptContent | Should Match '==LD_RESULT=='
+        }
+
+        It "Build-DiscoveryCommandFile includes DISCOVER_END markers" {
+            $scriptContent | Should Match '==DISCOVER_END=='
         }
     }
 }
