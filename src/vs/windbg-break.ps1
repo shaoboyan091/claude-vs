@@ -9,23 +9,29 @@
       Launch mode:  -Executable <path> starts the program under the debugger.
     Output is structured JSON with per-breakpoint hit data.
 
-    Commands are written to a temp script file and executed via cdb's $< command
-    to avoid nested quoting issues with -c.
+    Commands are written to a temp script file and executed via cdb's $$><@"file"
+    command to avoid nested quoting issues and support paths with spaces.
+
+    MaxHits is per-breakpoint: each breakpoint has its own hit counter using
+    pseudo-registers $t0..$t19. Maximum 20 breakpoints per session.
 .PARAMETER Executable
     Path to executable to launch under the debugger (launch mode).
+    Mutually exclusive with ProcessId.
 .PARAMETER ProcessId
     Process ID to attach to (attach mode).
+    Mutually exclusive with Executable.
 .PARAMETER Arguments
     Arguments to pass to the executable (launch mode only).
 .PARAMETER WorkingDirectory
     Working directory for the launched process (launch mode only).
 .PARAMETER Breakpoints
     Breakpoint locations as string array (e.g. "module!Function", "module!Class::Method").
+    Maximum 20 breakpoints per session.
 .PARAMETER BreakOnEntry
     If set, do not skip the initial debugger breakpoint. Pre-commands and symbol
-    setup run at the initial break before continuing.
+    setup run at the initial break before continuing. Only effective in launch mode.
 .PARAMETER MaxHits
-    Maximum breakpoint hits before quitting (default: 1).
+    Maximum breakpoint hits per breakpoint before quitting (default: 1).
 .PARAMETER OnHit
     Action at each breakpoint hit: stack, locals, full, step (default: full).
 .PARAMETER StepCount
@@ -160,13 +166,20 @@ function Build-CommandFile {
         [int]$MaxHitCount,
         [bool]$IsAttachMode,
         [string]$SymPath,
-        [string]$PreCmds
+        [string]$PreCmds,
+        [bool]$SkipInitialBreak
     )
 
     $lines = @()
 
     $lines += "sxd *"
-    $lines += "sxe epr"
+    $lines += "sxe av"
+    $lines += "sxe sov"
+    if ($IsAttachMode) {
+        $lines += "sxe -c `".echo ==PROCESS_EXITED==;.detach;q`" ep"
+    } else {
+        $lines += "sxe -c `".echo ==PROCESS_EXITED==;q`" ep"
+    }
 
     if ($SymPath) {
         $lines += ".sympath+ $SymPath"
@@ -177,9 +190,13 @@ function Build-CommandFile {
         $lines += $PreCmds
     }
 
-    $lines += "r `$t0 = 0"
+    $bpCount = $BpLocations.Count
+    for ($i = 0; $i -lt $bpCount; $i++) {
+        $lines += "r `$t$i = 0"
+    }
 
-    foreach ($bp in $BpLocations) {
+    for ($i = 0; $i -lt $bpCount; $i++) {
+        $bp = $BpLocations[$i]
         $actionCmds = Build-BreakpointAction -Location $bp -Action $Action -Steps $Steps -StepCmd $StepCmd
 
         if ($IsAttachMode) {
@@ -188,7 +205,7 @@ function Build-CommandFile {
             $quitCmd = "q"
         }
 
-        $buBody = "r `$t0 = @`$t0 + 1; .if (@`$t0 >= $MaxHitCount) { $actionCmds;$quitCmd } .else { $actionCmds;gc }"
+        $buBody = "r `$t$i = @`$t$i + 1; .if (@`$t$i >= $MaxHitCount) { $actionCmds;$quitCmd } .else { $actionCmds;gc }"
         $lines += "bu $bp `"$buBody`""
     }
 
@@ -250,10 +267,10 @@ function Parse-BreakpointOutput {
         $section = "stack"
         foreach ($line in $lines) {
             $trimmed = $line.Trim()
-            if ($trimmed -match '^\s*\w+\s+=') {
+            if ($trimmed -match '\w+\s+=\s+' -and $trimmed -notmatch '^(Child-SP|RetAddr|Call Site|[0-9a-f]{2,} )') {
                 $section = "locals"
             }
-            if ($trimmed -match '^[a-z]{2,3}=') {
+            if ($trimmed -match '^[a-z]{2,3}=[0-9a-f]') {
                 $section = "registers"
             }
             switch ($section) {
@@ -275,7 +292,7 @@ function Parse-BreakpointOutput {
             $sSec = "stack"
             foreach ($sl in $stepLines) {
                 $st = $sl.Trim()
-                if ($st -match '^\s*\w+\s+=') { $sSec = "locals" }
+                if ($st -match '\w+\s+=\s+' -and $st -notmatch '^(Child-SP|RetAddr|Call Site|[0-9a-f]{2,} )') { $sSec = "locals" }
                 switch ($sSec) {
                     "stack"  { $sStack += $sl }
                     "locals" { $sLocals += $sl }
@@ -307,6 +324,9 @@ try {
     }
 
     $launchMode = $false
+    if ($Executable -and $ProcessId -gt 0) {
+        throw "Cannot specify both -Executable and -ProcessId. Use one or the other."
+    }
     if ($Executable) {
         if (-not (Test-Path $Executable)) {
             throw "Executable not found: $Executable"
@@ -314,6 +334,9 @@ try {
         $launchMode = $true
     } elseif ($ProcessId -gt 0) {
         $proc = Get-Process -Id $ProcessId -ErrorAction Stop
+        if ($BreakOnEntry) {
+            Write-Warning "-BreakOnEntry has no effect in attach mode (ignored)"
+        }
     } else {
         throw "Must specify either -ProcessId (attach mode) or -Executable (launch mode)"
     }
@@ -321,11 +344,17 @@ try {
     if ($Breakpoints.Count -eq 0) {
         throw "At least one breakpoint location is required"
     }
+    if ($Breakpoints.Count -gt 20) {
+        throw "Maximum 20 breakpoints per session (limited by cdb pseudo-registers `$t0..`$t19)"
+    }
 
     $stepCmd = if ($StepMode -eq "into") { "t" } else { "p" }
 
     $tempFile = [System.IO.Path]::GetTempFileName()
+    $shortTempFile = (New-Object -ComObject Scripting.FileSystemObject).GetFile($tempFile).ShortPath
     try {
+        $skipInitial = $launchMode -and (-not $BreakOnEntry)
+
         Build-CommandFile -TempPath $tempFile `
             -BpLocations $Breakpoints `
             -Action $OnHit `
@@ -334,7 +363,8 @@ try {
             -MaxHitCount $MaxHits `
             -IsAttachMode (-not $launchMode) `
             -SymPath $SymbolPath `
-            -PreCmds $PreCommands
+            -PreCmds $PreCommands `
+            -SkipInitialBreak $skipInitial
 
         $cmdArgs = @()
 
@@ -358,7 +388,7 @@ try {
         }
 
         $cmdArgs += "-c"
-        $cmdArgs += "`"`$<$tempFile`""
+        $cmdArgs += "`"$$><@`"$shortTempFile`"`""
 
         if ($launchMode) {
             $cmdArgs += $Executable
@@ -368,7 +398,7 @@ try {
         }
 
         Write-Verbose "Running: $CdbPath $($cmdArgs -join ' ')"
-        Write-Verbose "Command file: $tempFile"
+        Write-Verbose "Command file: $tempFile (short: $shortTempFile)"
 
         $psi = New-Object System.Diagnostics.ProcessStartInfo
         $psi.FileName = $CdbPath
@@ -376,6 +406,7 @@ try {
         $psi.UseShellExecute = $false
         $psi.RedirectStandardOutput = $true
         $psi.RedirectStandardError = $true
+        $psi.RedirectStandardInput = $true
         $psi.CreateNoWindow = $true
 
         if ($launchMode -and $WorkingDirectory) {
@@ -389,7 +420,16 @@ try {
 
         $exited = $process.WaitForExit($Timeout * 1000)
         if (-not $exited) {
-            $process.Kill()
+            try {
+                $process.StandardInput.WriteLine(".detach;q")
+                $process.StandardInput.Flush()
+                $graceful = $process.WaitForExit(5000)
+                if (-not $graceful) {
+                    $process.Kill()
+                }
+            } catch {
+                $process.Kill()
+            }
             throw "cdb session timed out after ${Timeout}s"
         }
 

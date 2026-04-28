@@ -92,8 +92,12 @@ Describe "windbg-break.ps1" {
             $scriptContent | Should Match 'GetTempFileName'
         }
 
-        It "Uses dollar-less-than for command file execution" {
-            $scriptContent | Should Match '\$<'
+        It "Uses $$><@ for quoted command file execution" {
+            $scriptContent | Should Match '\$\$><@'
+        }
+
+        It "Uses 8.3 short path for temp file" {
+            $scriptContent | Should Match 'ShortPath'
         }
 
         It "Cleans up temp file in finally block" {
@@ -124,17 +128,21 @@ Describe "windbg-break.ps1" {
         }
     }
 
-    Context "MaxHits via pseudo-register counter" {
-        It "Initializes counter register t0" {
-            $scriptContent | Should Match 'r \`\$t0 = 0'
+    Context "Per-breakpoint hit counters" {
+        It "Initializes per-BP counter registers" {
+            $scriptContent | Should Match 'r \`\$t\$i = 0'
         }
 
-        It "Increments counter on each hit" {
-            $scriptContent | Should Match 'r \`\$t0 = @\`\$t0 \+ 1'
+        It "Increments per-BP counter on each hit" {
+            $scriptContent | Should Match 'r \`\$t\$i = @\`\$t\$i \+ 1'
         }
 
-        It "Uses .if to check hit count against MaxHits" {
-            $scriptContent | Should Match '\.if \(@\`\$t0 >='
+        It "Uses .if to check per-BP hit count against MaxHits" {
+            $scriptContent | Should Match '\.if \(@\`\$t\$i >='
+        }
+
+        It "Enforces 20 breakpoint limit" {
+            $scriptContent | Should Match 'Maximum 20 breakpoints'
         }
     }
 
@@ -187,8 +195,16 @@ Describe "windbg-break.ps1" {
             $scriptContent | Should Match 'sxd \*'
         }
 
-        It "Enables process exit event with sxe epr" {
-            $scriptContent | Should Match 'sxe epr'
+        It "Re-enables access violation with sxe av" {
+            $scriptContent | Should Match 'sxe av'
+        }
+
+        It "Re-enables stack overflow with sxe sov" {
+            $scriptContent | Should Match 'sxe sov'
+        }
+
+        It "Enables process exit event with sxe ep and a handler command" {
+            $scriptContent | Should Match 'sxe -c.*PROCESS_EXITED.*ep'
         }
     }
 
@@ -202,7 +218,7 @@ Describe "windbg-break.ps1" {
         }
 
         It "Splits step output by STEP markers" {
-            $scriptContent | Should Match '==STEP==\(\\\d\+\)==|==STEP=='
+            $scriptContent | Should Match '==STEP=='
         }
 
         It "Produces JSON output with breakpoints array" {
@@ -217,6 +233,18 @@ Describe "windbg-break.ps1" {
             $scriptContent | Should Match 'sStack'
             $scriptContent | Should Match 'sLocals'
         }
+
+        It "Uses improved locals detection regex with = pattern" {
+            $scriptContent | Should Match '\\w\+\\s\+=\\s\+'
+        }
+
+        It "Excludes stack header lines from locals detection" {
+            $scriptContent | Should Match 'Child-SP|RetAddr|Call Site'
+        }
+
+        It "Register detection requires hex digit after equals" {
+            $scriptContent | Should Match '\[a-z\].*=\[0-9a-f\]'
+        }
     }
 
     Context "Process execution pattern" {
@@ -228,8 +256,16 @@ Describe "windbg-break.ps1" {
             $scriptContent | Should Match 'ReadToEndAsync'
         }
 
-        It "Kills process on timeout" {
-            $scriptContent | Should Match 'if \(-not \$exited\)[\s\S]*?\$process\.Kill\(\)'
+        It "Redirects stdin for graceful shutdown" {
+            $scriptContent | Should Match 'RedirectStandardInput\s*=\s*\$true'
+        }
+
+        It "Attempts graceful detach before kill on timeout" {
+            $scriptContent | Should Match 'StandardInput\.WriteLine.*\.detach'
+        }
+
+        It "Falls back to Kill on timeout" {
+            $scriptContent | Should Match '\$process\.Kill\(\)'
         }
 
         It "Outputs JSON via ConvertTo-Json" {
@@ -254,8 +290,16 @@ Describe "windbg-break.ps1" {
             $scriptContent | Should Match 'if \(-not \$BreakOnEntry\)'
         }
 
+        It "Warns when BreakOnEntry used in attach mode" {
+            $scriptContent | Should Match 'Write-Warning.*BreakOnEntry.*attach'
+        }
+
         It "Requires either ProcessId or Executable" {
             $scriptContent | Should Match 'Must specify either -ProcessId.*or -Executable'
+        }
+
+        It "Rejects both ProcessId and Executable" {
+            $scriptContent | Should Match 'Cannot specify both'
         }
 
         It "Uses .detach in attach mode quit command" {

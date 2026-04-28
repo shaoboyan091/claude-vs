@@ -124,10 +124,10 @@ Describe "Regression tests for bug fixes" {
             $content | Should Match 'ReadToEndAsync'
         }
 
-        It "Uses command file instead of nested -c quotes" {
+        It "Uses $$><@ for quoted command file with space-safe paths" {
             $content = Get-Content "$PSScriptRoot/../../src/vs/windbg-break.ps1" -Raw
-            $content | Should Match 'GetTempFileName'
-            $content | Should Match '\$<'
+            $content | Should Match '\$\$><@'
+            $content | Should Match 'ShortPath'
         }
 
         It "Uses -G flag in launch mode" {
@@ -140,14 +140,16 @@ Describe "Regression tests for bug fixes" {
             $content | Should Match '\.detach;q'
         }
 
-        It "Uses pseudo-register for hit counting" {
+        It "Uses per-breakpoint pseudo-register counters" {
             $content = Get-Content "$PSScriptRoot/../../src/vs/windbg-break.ps1" -Raw
-            $content | Should Match '\$t0'
+            $content | Should Match '\$t\$i'
         }
 
-        It "Handles exceptions with sxd" {
+        It "Re-enables critical exceptions after sxd *" {
             $content = Get-Content "$PSScriptRoot/../../src/vs/windbg-break.ps1" -Raw
             $content | Should Match 'sxd \*'
+            $content | Should Match 'sxe av'
+            $content | Should Match 'sxe sov'
         }
     }
 
