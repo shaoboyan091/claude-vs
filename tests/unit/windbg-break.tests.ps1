@@ -306,4 +306,166 @@ Describe "windbg-break.ps1" {
             $scriptContent | Should Match '\.detach;q'
         }
     }
+
+    Context "Build-BreakpointAction output" {
+        BeforeAll {
+            $ast = [System.Management.Automation.Language.Parser]::ParseFile($ScriptPath, [ref]$null, [ref]$null)
+            $functions = $ast.FindAll({ $args[0] -is [System.Management.Automation.Language.FunctionDefinitionAst] }, $false)
+            foreach ($fn in $functions) {
+                Invoke-Expression $fn.Extent.Text
+            }
+        }
+
+        It "Returns marker and k for stack mode" {
+            $result = Build-BreakpointAction -Location "mod!Func" -Action "stack" -Steps 0 -StepCmd "p"
+            $result | Should Match '==BP_HIT==mod!Func=='
+            $result | Should Match ';k$'
+        }
+
+        It "Returns marker, k, dv /t for locals mode" {
+            $result = Build-BreakpointAction -Location "mod!Func" -Action "locals" -Steps 0 -StepCmd "p"
+            $result | Should Match ';k;dv /t$'
+        }
+
+        It "Returns marker, k, dv /t, r for full mode" {
+            $result = Build-BreakpointAction -Location "mod!Func" -Action "full" -Steps 0 -StepCmd "p"
+            $result | Should Match ';k;dv /t;r$'
+        }
+
+        It "Returns step commands with STEP markers for step mode" {
+            $result = Build-BreakpointAction -Location "mod!Func" -Action "step" -Steps 3 -StepCmd "p"
+            $result | Should Match '==STEP==1=='
+            $result | Should Match '==STEP==2=='
+            $result | Should Match '==STEP==3=='
+            $result | Should Match ';p;'
+        }
+
+        It "Uses t command for step-into mode" {
+            $result = Build-BreakpointAction -Location "mod!Func" -Action "step" -Steps 1 -StepCmd "t"
+            $result | Should Match ';t;'
+        }
+    }
+
+    Context "Build-CommandFile output" {
+        BeforeAll {
+            $ast = [System.Management.Automation.Language.Parser]::ParseFile($ScriptPath, [ref]$null, [ref]$null)
+            $functions = $ast.FindAll({ $args[0] -is [System.Management.Automation.Language.FunctionDefinitionAst] }, $false)
+            foreach ($fn in $functions) {
+                Invoke-Expression $fn.Extent.Text
+            }
+        }
+
+        It "Generates file with counter init, bu commands, and g" {
+            $tmpFile = [System.IO.Path]::GetTempFileName()
+            try {
+                Build-CommandFile -TempPath $tmpFile `
+                    -BpLocations @("mod!FuncA", "mod!FuncB") `
+                    -Action "full" -Steps 10 -StepCmd "p" `
+                    -MaxHitCount 2 -IsAttachMode $false `
+                    -SymPath "" -PreCmds ""
+                $content = Get-Content $tmpFile -Raw
+
+                $content | Should Match 'r \$t0 = 0'
+                $content | Should Match 'r \$t1 = 0'
+                $content | Should Match 'bu mod!FuncA'
+                $content | Should Match 'bu mod!FuncB'
+                $content | Should Match '\ng\s*$'
+            } finally {
+                Remove-Item $tmpFile -Force -ErrorAction SilentlyContinue
+            }
+        }
+
+        It "Includes .sympath+ and .reload when SymPath is set" {
+            $tmpFile = [System.IO.Path]::GetTempFileName()
+            try {
+                Build-CommandFile -TempPath $tmpFile `
+                    -BpLocations @("mod!Func") `
+                    -Action "stack" -Steps 0 -StepCmd "p" `
+                    -MaxHitCount 1 -IsAttachMode $false `
+                    -SymPath "C:\symbols" -PreCmds ""
+                $content = Get-Content $tmpFile -Raw
+
+                $content | Should Match '\.sympath\+ C:\\symbols'
+                $content | Should Match '\.reload'
+            } finally {
+                Remove-Item $tmpFile -Force -ErrorAction SilentlyContinue
+            }
+        }
+
+        It "Includes .detach in quit command for attach mode" {
+            $tmpFile = [System.IO.Path]::GetTempFileName()
+            try {
+                Build-CommandFile -TempPath $tmpFile `
+                    -BpLocations @("mod!Func") `
+                    -Action "stack" -Steps 0 -StepCmd "p" `
+                    -MaxHitCount 1 -IsAttachMode $true `
+                    -SymPath "" -PreCmds ""
+                $content = Get-Content $tmpFile -Raw
+
+                $content | Should Match '\.detach;q'
+            } finally {
+                Remove-Item $tmpFile -Force -ErrorAction SilentlyContinue
+            }
+        }
+    }
+
+    Context "Parse-BreakpointOutput with realistic input" {
+        BeforeAll {
+            $ast = [System.Management.Automation.Language.Parser]::ParseFile($ScriptPath, [ref]$null, [ref]$null)
+            $functions = $ast.FindAll({ $args[0] -is [System.Management.Automation.Language.FunctionDefinitionAst] }, $false)
+            foreach ($fn in $functions) {
+                Invoke-Expression $fn.Extent.Text
+            }
+        }
+
+        It "Parses single breakpoint hit with stack" {
+            $raw = "some preamble`n==BP_HIT==mod!Func==`nChild-SP          RetAddr           Call Site`n00000000`'1234abcd 00000000`'5678efgh mod!Func+0x10`n"
+            $results = @(Parse-BreakpointOutput -RawOutput $raw -Locations @("mod!Func"))
+            $results.Count | Should Be 1
+            $results[0].hitCount | Should Be 1
+            $results[0].location | Should Be "mod!Func"
+            $results[0].hits[0].stack | Should Match 'mod!Func'
+        }
+
+        It "Parses multiple hits for same breakpoint" {
+            $raw = "==BP_HIT==mod!Func==`nstack1`n==BP_HIT==mod!Func==`nstack2`n"
+            $results = @(Parse-BreakpointOutput -RawOutput $raw -Locations @("mod!Func"))
+            $results[0].hitCount | Should Be 2
+        }
+
+        It "Parses step output with STEP markers" {
+            $raw = "==BP_HIT==mod!Func==`ninitial stack`n==STEP==1==`nmod!Func+0x5:`n00 00`nChildSP line`n==STEP==2==`nmod!Func+0xa:`n"
+            $results = @(Parse-BreakpointOutput -RawOutput $raw -Locations @("mod!Func"))
+            $results[0].hits[0].steps.Count | Should Be 2
+            $results[0].hits[0].steps[0].step | Should Be 1
+            $results[0].hits[0].steps[1].step | Should Be 2
+        }
+
+        It "Returns zero hitCount for unhit breakpoints" {
+            $raw = "==BP_HIT==mod!FuncA==`nstack`n"
+            $results = @(Parse-BreakpointOutput -RawOutput $raw -Locations @("mod!FuncA", "mod!FuncB"))
+            $results[1].hitCount | Should Be 0
+            $results[1].location | Should Be "mod!FuncB"
+        }
+
+        It "Parses locals with assignment pattern" {
+            $raw = "==BP_HIT==mod!Func==`nChild-SP RetAddr Call Site`n00 00 mod!Func`nint x = 42`nfloat y = 3.14`n"
+            $results = @(Parse-BreakpointOutput -RawOutput $raw -Locations @("mod!Func"))
+            $results[0].hits[0].locals | Should Match 'x = 42'
+        }
+
+        It "Parses registers starting with lowercase letters" {
+            $raw = "==BP_HIT==mod!Func==`nChild-SP RetAddr Call Site`n00 00 mod!Func`nrax=0000000000000001 rbx=0000000000000002`n"
+            $results = @(Parse-BreakpointOutput -RawOutput $raw -Locations @("mod!Func"))
+            $results[0].hits[0].registers | Should Match 'rax=0000000000000001'
+        }
+    }
+
+    Context "Error validation" {
+        It "Throws when both Executable and ProcessId are specified" {
+            {
+                & $ScriptPath -Executable "C:\fake.exe" -ProcessId 9999 -Breakpoints "main" 2>&1
+            } | Should Throw
+        }
+    }
 }

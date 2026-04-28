@@ -67,7 +67,7 @@ Describe "windbg-attach.ps1" {
         }
 
         It "Always appends .detach;q after CommandFile execution" {
-            $scriptContent | Should Match '\$`<\$CommandFile;\.detach;q'
+            $scriptContent | Should Match '><@.*CommandFile.*\.detach;q'
         }
     }
 
@@ -111,8 +111,8 @@ Describe "windbg-attach.ps1" {
             $scriptContent | Should Match '\$cmdArgs \+= "-G"'
         }
 
-        It "Puts executable at end of argument list" {
-            $scriptContent | Should Match '\$cmdArgs \+= \$Executable'
+        It "Puts executable at end of argument list (quoted)" {
+            $scriptContent | Should Match '\$cmdArgs \+= "`"?\$Executable'
         }
 
         It "Sets WorkingDirectory on ProcessStartInfo" {

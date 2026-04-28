@@ -151,9 +151,9 @@ try {
             throw "Command file not found: $CommandFile"
         }
         if ($launchMode) {
-            $cmdString = "`$`<$CommandFile;q"
+            $cmdString = "`$`$><@`"$CommandFile`";q"
         } else {
-            $cmdString = "`$`<$CommandFile;.detach;q"
+            $cmdString = "`$`$><@`"$CommandFile`";.detach;q"
         }
     } elseif ($Commands) {
         $cmdString = "$Commands"
@@ -181,7 +181,7 @@ try {
 
     # In launch mode, executable and its arguments come last
     if ($launchMode) {
-        $cmdArgs += $Executable
+        $cmdArgs += "`"$Executable`""
         if ($Arguments) {
             $cmdArgs += $Arguments
         }
@@ -195,6 +195,7 @@ try {
     $psi.UseShellExecute = $false
     $psi.RedirectStandardOutput = $true
     $psi.RedirectStandardError = $true
+    $psi.RedirectStandardInput = $true
     $psi.CreateNoWindow = $true
 
     if ($launchMode -and $WorkingDirectory) {
@@ -208,7 +209,25 @@ try {
 
     $exited = $process.WaitForExit($Timeout * 1000)
     if (-not $exited) {
-        $process.Kill()
+        try {
+            $process.StandardInput.WriteLine(".detach;q")
+            $process.StandardInput.Flush()
+            $graceful = $process.WaitForExit(5000)
+            if (-not $graceful) {
+                $process.Kill()
+            }
+        } catch {
+            $process.Kill()
+        }
+        if ($launchMode) {
+            # Clean up the launched process if it's still running
+            try {
+                $childProcs = Get-Process | Where-Object { $_.Path -eq $Executable } -ErrorAction SilentlyContinue
+                foreach ($cp in $childProcs) {
+                    try { $cp.Kill() } catch { }
+                }
+            } catch { }
+        }
         throw "cdb session timed out after ${Timeout}s"
     }
 

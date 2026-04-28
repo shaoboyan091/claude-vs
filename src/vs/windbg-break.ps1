@@ -166,8 +166,7 @@ function Build-CommandFile {
         [int]$MaxHitCount,
         [bool]$IsAttachMode,
         [string]$SymPath,
-        [string]$PreCmds,
-        [bool]$SkipInitialBreak
+        [string]$PreCmds
     )
 
     $lines = @()
@@ -353,8 +352,6 @@ try {
     $tempFile = [System.IO.Path]::GetTempFileName()
     $shortTempFile = (New-Object -ComObject Scripting.FileSystemObject).GetFile($tempFile).ShortPath
     try {
-        $skipInitial = $launchMode -and (-not $BreakOnEntry)
-
         Build-CommandFile -TempPath $tempFile `
             -BpLocations $Breakpoints `
             -Action $OnHit `
@@ -363,8 +360,7 @@ try {
             -MaxHitCount $MaxHits `
             -IsAttachMode (-not $launchMode) `
             -SymPath $SymbolPath `
-            -PreCmds $PreCommands `
-            -SkipInitialBreak $skipInitial
+            -PreCmds $PreCommands
 
         $cmdArgs = @()
 
@@ -388,7 +384,7 @@ try {
         }
 
         $cmdArgs += "-c"
-        $cdbCmd = "`$`$><@`"$shortTempFile`""
+        $cdbCmd = "`$`$><@$shortTempFile"
         $cmdArgs += $cdbCmd
 
         if ($launchMode) {

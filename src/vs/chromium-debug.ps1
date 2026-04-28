@@ -138,6 +138,10 @@ try {
 
     $debugSuccess = $true
 
+    if ($attachResult) {
+        $attachResult = $attachResult | ConvertFrom-Json
+    }
+
     Write-Output (ConvertTo-Json @{
         success       = $true
         chromePid     = $chromeProc.Id

@@ -66,6 +66,33 @@ Describe "Chromium E2E smoke tests" -Tag "E2E" {
         }
     }
 
+    Context "windbg-break attaches to Chrome GPU process with breakpoint" {
+        It "Captures breakpoint hit data on a GPU function" {
+            if (-not $RunE2E) { Write-Host "  SKIPPED: E2E not enabled"; return }
+
+            $procs = & "$SrcRoot/util/find-process.ps1" -ProcessName chrome -Type gpu 2>&1 | ConvertFrom-Json
+            if ($procs.count -eq 0) {
+                Write-Host "  SKIPPED: No Chrome GPU process found"
+                return
+            }
+            $gpuPid = $procs.results[0].pid
+
+            $output = & "$SrcRoot/vs/windbg-break.ps1" `
+                -ProcessId $gpuPid `
+                -Breakpoints "ntdll!NtWaitForSingleObject" `
+                -OnHit full `
+                -MaxHits 1 `
+                -Timeout 30 2>&1
+            $result = $output | ConvertFrom-Json
+            $result.success | Should Be $true
+            $result.mode | Should Be "attach"
+            $result.breakpoints | Should Not BeNullOrEmpty
+            $result.breakpoints[0].location | Should Be "ntdll!NtWaitForSingleObject"
+            ($result.breakpoints[0].hitCount -ge 1) | Should Be $true
+            $result.breakpoints[0].hits[0].stack | Should Not BeNullOrEmpty
+        }
+    }
+
     Context "screenshot captures Chrome window" {
         It "Captures Chrome window by title" {
             if (-not $RunE2E) { Write-Host "  SKIPPED: E2E not enabled"; return }

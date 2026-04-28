@@ -83,7 +83,7 @@ try {
         if ($ChromePath -and $proc.ExecutablePath) {
             $normalizedExe = $proc.ExecutablePath.Replace('/', '\').TrimEnd('\')
             $normalizedTarget = $ChromePath.Replace('/', '\').TrimEnd('\')
-            if ($normalizedExe -ne $normalizedTarget) {
+            if ($normalizedExe -ine $normalizedTarget) {
                 continue
             }
         }
