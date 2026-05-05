@@ -10,16 +10,19 @@
         "ProcessId": { "type": "integer", "description": "Process ID to attach to" },
         "Executable": { "type": "string", "description": "Executable to launch under debugger" },
         "Arguments": { "type": "string", "description": "Arguments for launched executable" },
-        "VsVersion": { "type": "string", "description": "Visual Studio version (e.g. 2022, 2019)" }
-      }
+        "VsVersion": { "type": "string", "enum": ["2022", "2019", "auto"], "description": "Visual Studio version preference" }
+      },
+      "oneOf": [{"required": ["ProcessId"]}, {"required": ["Executable"]}]
     },
     "output": {
       "type": "object",
       "properties": {
         "success": { "type": "boolean" },
-        "method": { "type": "string", "description": "attach or launch" },
+        "method": { "type": "string", "enum": ["vsjitdebugger", "devenv-manual", "devenv-debugexe"], "description": "Debugger attach method used" },
         "pid": { "type": "integer" },
+        "processName": { "type": "string", "description": "Process name (attach mode)" },
         "executable": { "type": "string" },
+        "arguments": { "type": "string", "description": "Arguments (launch mode)" },
         "note": { "type": "string" }
       },
       "required": ["success", "method"]

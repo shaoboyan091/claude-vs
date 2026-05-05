@@ -11,8 +11,10 @@
         "Api": { "type": "string", "enum": ["d3d11", "d3d12", "vulkan"], "description": "Graphics API to hook" },
         "OutputDir": { "type": "string", "description": "Directory for capture output" },
         "ChromeArgs": { "type": "string", "description": "Chrome-specific arguments" },
-        "Duration": { "type": "integer", "description": "Capture duration in seconds" }
-      }
+        "Duration": { "type": "integer", "description": "Capture duration in seconds" },
+        "GpaPath": { "type": "string", "description": "Path to gpa-injector.exe (auto-detected if omitted)" }
+      },
+      "required": ["Executable"]
     },
     "output": {
       "type": "object",

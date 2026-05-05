@@ -13,7 +13,8 @@
         "Timeout": { "type": "integer", "description": "Timeout in seconds" },
         "PixInstallDir": { "type": "string", "description": "PIX installation directory" },
         "Arguments": { "type": "string", "description": "Arguments for the executable" }
-      }
+      },
+      "required": ["Executable"]
     },
     "output": {
       "type": "object",
@@ -22,7 +23,11 @@
         "outputPath": { "type": "string" },
         "captureExists": { "type": "boolean" },
         "pixDll": { "type": "string" },
-        "frames": { "type": "integer" }
+        "frames": { "type": "integer" },
+        "executable": { "type": "string" },
+        "stdout": { "type": "string" },
+        "stderr": { "type": "string" },
+        "note": { "type": "string" }
       },
       "required": ["success", "outputPath", "captureExists"]
     },

@@ -11,8 +11,11 @@
         "Activity": { "type": "string", "enum": ["FrameDebugger", "GPUTrace"], "description": "Capture activity type" },
         "OutputPath": { "type": "string", "description": "Output file path" },
         "Arguments": { "type": "string", "description": "Arguments for the executable" },
-        "CaptureFrame": { "type": "integer", "description": "Frame number to capture" }
-      }
+        "CaptureFrame": { "type": "integer", "description": "Frame number to capture" },
+        "NgfxPath": { "type": "string", "description": "Path to ngfx.exe (auto-detected if omitted)" },
+        "Timeout": { "type": "integer", "description": "Timeout in seconds (default: 120)" }
+      },
+      "required": ["Executable"]
     },
     "output": {
       "type": "object",
@@ -22,7 +25,8 @@
         "outputPath": { "type": "string" },
         "outputFiles": { "type": "array", "items": { "type": "string" } },
         "stdout": { "type": "string" },
-        "stderr": { "type": "string" }
+        "stderr": { "type": "string" },
+        "executable": { "type": "string" }
       },
       "required": ["success", "activity", "outputPath"]
     },

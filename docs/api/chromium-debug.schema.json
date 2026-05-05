@@ -14,7 +14,8 @@
         "ExtraArgs": { "type": "array", "items": { "type": "string" }, "description": "Extra Chrome command-line arguments" },
         "CdbCommands": { "type": "string", "description": "CDB commands to run on attach" },
         "OutputLog": { "type": "string", "description": "Path to debugger output log" }
-      }
+      },
+      "required": ["Target"]
     },
     "output": {
       "type": "object",

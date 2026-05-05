@@ -14,8 +14,7 @@
         "Breakpoints": {
           "type": "array",
           "items": { "type": "string" },
-          "minItems": 1,
-          "description": "Breakpoint locations (e.g. module!Function, module!Class::Method)"
+          "description": "Breakpoint locations (e.g. module!Function, module!Class::Method). Not required when using ListModules or DiscoverSymbols."
         },
         "BreakOnEntry": { "type": "boolean", "description": "Do not skip initial debugger breakpoint" },
         "MaxHits": { "type": "integer", "default": 1, "description": "Max breakpoint hits before quitting" },

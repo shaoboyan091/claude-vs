@@ -10,7 +10,8 @@
         "Duration": { "type": "integer", "description": "Collection duration in seconds" },
         "OutputPath": { "type": "string", "description": "Output file path" },
         "Features": { "type": "string", "description": "Features to collect (e.g. cpu-cstate, gpu-cstate, freq, power)" },
-        "RunElevated": { "type": "boolean", "description": "Run with elevated privileges" }
+        "RunElevated": { "type": "boolean", "description": "Run with elevated privileges" },
+        "SocWatchPath": { "type": "string", "description": "Path to socwatch.exe (auto-detected if omitted)" }
       },
       "required": ["Duration"]
     },
@@ -22,7 +23,10 @@
         "features": { "type": "string", "description": "Comma-separated feature list" },
         "files": { "type": "array", "items": { "type": "string" } },
         "csvSummary": { "type": "object", "description": "Parsed CSV summary with sections" },
-        "summaryJson": { "type": "string", "description": "Path to summary JSON file" }
+        "summaryJson": { "type": "string", "description": "Path to summary JSON file" },
+        "outputPath": { "type": "string" },
+        "stdout": { "type": "string" },
+        "stderr": { "type": "string" }
       },
       "required": ["success", "duration", "features", "files"]
     },

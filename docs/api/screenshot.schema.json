@@ -23,7 +23,8 @@
           "type": "string",
           "description": "File path for the output image"
         }
-      }
+      },
+      "required": ["OutputPath"]
     },
     "output": {
       "type": "object",
