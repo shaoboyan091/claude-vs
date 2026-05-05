@@ -7,7 +7,7 @@
     "input": {
       "type": "object",
       "properties": {
-        "Pid": { "type": "integer", "description": "Process ID to attach to" },
+        "ProcessId": { "type": "integer", "description": "Process ID to attach to" },
         "Executable": { "type": "string", "description": "Executable to launch under debugger" },
         "Arguments": { "type": "string", "description": "Arguments for launched executable" },
         "VsVersion": { "type": "string", "description": "Visual Studio version (e.g. 2022, 2019)" }

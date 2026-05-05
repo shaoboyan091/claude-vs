@@ -308,12 +308,10 @@ Describe "windbg-break.ps1" {
     }
 
     Context "Build-BreakpointAction output" {
-        BeforeAll {
-            $ast = [System.Management.Automation.Language.Parser]::ParseFile($ScriptPath, [ref]$null, [ref]$null)
-            $functions = $ast.FindAll({ $args[0] -is [System.Management.Automation.Language.FunctionDefinitionAst] }, $false)
-            foreach ($fn in $functions) {
-                Invoke-Expression $fn.Extent.Text
-            }
+        $ast = [System.Management.Automation.Language.Parser]::ParseFile($ScriptPath, [ref]$null, [ref]$null)
+        $functions = $ast.FindAll({ $args[0] -is [System.Management.Automation.Language.FunctionDefinitionAst] }, $false)
+        foreach ($fn in $functions) {
+            Invoke-Expression $fn.Extent.Text
         }
 
         It "Returns marker and k for stack mode" {
@@ -347,12 +345,10 @@ Describe "windbg-break.ps1" {
     }
 
     Context "Build-CommandFile output" {
-        BeforeAll {
-            $ast = [System.Management.Automation.Language.Parser]::ParseFile($ScriptPath, [ref]$null, [ref]$null)
-            $functions = $ast.FindAll({ $args[0] -is [System.Management.Automation.Language.FunctionDefinitionAst] }, $false)
-            foreach ($fn in $functions) {
-                Invoke-Expression $fn.Extent.Text
-            }
+        $ast = [System.Management.Automation.Language.Parser]::ParseFile($ScriptPath, [ref]$null, [ref]$null)
+        $functions = $ast.FindAll({ $args[0] -is [System.Management.Automation.Language.FunctionDefinitionAst] }, $false)
+        foreach ($fn in $functions) {
+            Invoke-Expression $fn.Extent.Text
         }
 
         It "Generates file with counter init, bu commands, and g" {
@@ -412,12 +408,10 @@ Describe "windbg-break.ps1" {
     }
 
     Context "Parse-BreakpointOutput with realistic input" {
-        BeforeAll {
-            $ast = [System.Management.Automation.Language.Parser]::ParseFile($ScriptPath, [ref]$null, [ref]$null)
-            $functions = $ast.FindAll({ $args[0] -is [System.Management.Automation.Language.FunctionDefinitionAst] }, $false)
-            foreach ($fn in $functions) {
-                Invoke-Expression $fn.Extent.Text
-            }
+        $ast = [System.Management.Automation.Language.Parser]::ParseFile($ScriptPath, [ref]$null, [ref]$null)
+        $functions = $ast.FindAll({ $args[0] -is [System.Management.Automation.Language.FunctionDefinitionAst] }, $false)
+        foreach ($fn in $functions) {
+            Invoke-Expression $fn.Extent.Text
         }
 
         It "Parses single breakpoint hit with stack" {
@@ -488,12 +482,10 @@ Describe "windbg-break.ps1" {
     }
 
     Context "Build-CommandFile with SymbolModules" {
-        BeforeAll {
-            $ast = [System.Management.Automation.Language.Parser]::ParseFile($ScriptPath, [ref]$null, [ref]$null)
-            $functions = $ast.FindAll({ $args[0] -is [System.Management.Automation.Language.FunctionDefinitionAst] }, $false)
-            foreach ($fn in $functions) {
-                Invoke-Expression $fn.Extent.Text
-            }
+        $ast = [System.Management.Automation.Language.Parser]::ParseFile($ScriptPath, [ref]$null, [ref]$null)
+        $functions = $ast.FindAll({ $args[0] -is [System.Management.Automation.Language.FunctionDefinitionAst] }, $false)
+        foreach ($fn in $functions) {
+            Invoke-Expression $fn.Extent.Text
         }
 
         It "Generates ld commands for each module and skips .reload" {
@@ -539,12 +531,10 @@ Describe "windbg-break.ps1" {
     }
 
     Context "Build-DiscoveryCommandFile output" {
-        BeforeAll {
-            $ast = [System.Management.Automation.Language.Parser]::ParseFile($ScriptPath, [ref]$null, [ref]$null)
-            $functions = $ast.FindAll({ $args[0] -is [System.Management.Automation.Language.FunctionDefinitionAst] }, $false)
-            foreach ($fn in $functions) {
-                Invoke-Expression $fn.Extent.Text
-            }
+        $ast = [System.Management.Automation.Language.Parser]::ParseFile($ScriptPath, [ref]$null, [ref]$null)
+        $functions = $ast.FindAll({ $args[0] -is [System.Management.Automation.Language.FunctionDefinitionAst] }, $false)
+        foreach ($fn in $functions) {
+            Invoke-Expression $fn.Extent.Text
         }
 
         It "Generates x commands for each pattern" {
@@ -570,12 +560,10 @@ Describe "windbg-break.ps1" {
     }
 
     Context "Build-ListModulesCommandFile output" {
-        BeforeAll {
-            $ast = [System.Management.Automation.Language.Parser]::ParseFile($ScriptPath, [ref]$null, [ref]$null)
-            $functions = $ast.FindAll({ $args[0] -is [System.Management.Automation.Language.FunctionDefinitionAst] }, $false)
-            foreach ($fn in $functions) {
-                Invoke-Expression $fn.Extent.Text
-            }
+        $ast = [System.Management.Automation.Language.Parser]::ParseFile($ScriptPath, [ref]$null, [ref]$null)
+        $functions = $ast.FindAll({ $args[0] -is [System.Management.Automation.Language.FunctionDefinitionAst] }, $false)
+        foreach ($fn in $functions) {
+            Invoke-Expression $fn.Extent.Text
         }
 
         It "Generates lm command with markers" {
@@ -596,12 +584,10 @@ Describe "windbg-break.ps1" {
     }
 
     Context "Parse-ModuleList" {
-        BeforeAll {
-            $ast = [System.Management.Automation.Language.Parser]::ParseFile($ScriptPath, [ref]$null, [ref]$null)
-            $functions = $ast.FindAll({ $args[0] -is [System.Management.Automation.Language.FunctionDefinitionAst] }, $false)
-            foreach ($fn in $functions) {
-                Invoke-Expression $fn.Extent.Text
-            }
+        $ast = [System.Management.Automation.Language.Parser]::ParseFile($ScriptPath, [ref]$null, [ref]$null)
+        $functions = $ast.FindAll({ $args[0] -is [System.Management.Automation.Language.FunctionDefinitionAst] }, $false)
+        foreach ($fn in $functions) {
+            Invoke-Expression $fn.Extent.Text
         }
 
         It "Parses lm output into module list" {
@@ -628,12 +614,10 @@ quit:
     }
 
     Context "Parse-SymbolDiscovery" {
-        BeforeAll {
-            $ast = [System.Management.Automation.Language.Parser]::ParseFile($ScriptPath, [ref]$null, [ref]$null)
-            $functions = $ast.FindAll({ $args[0] -is [System.Management.Automation.Language.FunctionDefinitionAst] }, $false)
-            foreach ($fn in $functions) {
-                Invoke-Expression $fn.Extent.Text
-            }
+        $ast = [System.Management.Automation.Language.Parser]::ParseFile($ScriptPath, [ref]$null, [ref]$null)
+        $functions = $ast.FindAll({ $args[0] -is [System.Management.Automation.Language.FunctionDefinitionAst] }, $false)
+        foreach ($fn in $functions) {
+            Invoke-Expression $fn.Extent.Text
         }
 
         It "Parses x command output into symbol lists" {
@@ -683,12 +667,10 @@ quit:
     }
 
     Context "Parse-Diagnostics for module loading" {
-        BeforeAll {
-            $ast = [System.Management.Automation.Language.Parser]::ParseFile($ScriptPath, [ref]$null, [ref]$null)
-            $functions = $ast.FindAll({ $args[0] -is [System.Management.Automation.Language.FunctionDefinitionAst] }, $false)
-            foreach ($fn in $functions) {
-                Invoke-Expression $fn.Extent.Text
-            }
+        $ast = [System.Management.Automation.Language.Parser]::ParseFile($ScriptPath, [ref]$null, [ref]$null)
+        $functions = $ast.FindAll({ $args[0] -is [System.Management.Automation.Language.FunctionDefinitionAst] }, $false)
+        foreach ($fn in $functions) {
+            Invoke-Expression $fn.Extent.Text
         }
 
         It "Detects successful module load" {
@@ -723,12 +705,10 @@ quit:
     }
 
     Context "Parse-Diagnostics for breakpoint setting" {
-        BeforeAll {
-            $ast = [System.Management.Automation.Language.Parser]::ParseFile($ScriptPath, [ref]$null, [ref]$null)
-            $functions = $ast.FindAll({ $args[0] -is [System.Management.Automation.Language.FunctionDefinitionAst] }, $false)
-            foreach ($fn in $functions) {
-                Invoke-Expression $fn.Extent.Text
-            }
+        $ast = [System.Management.Automation.Language.Parser]::ParseFile($ScriptPath, [ref]$null, [ref]$null)
+        $functions = $ast.FindAll({ $args[0] -is [System.Management.Automation.Language.FunctionDefinitionAst] }, $false)
+        foreach ($fn in $functions) {
+            Invoke-Expression $fn.Extent.Text
         }
 
         It "Detects successful breakpoint set" {
@@ -762,12 +742,10 @@ quit:
     }
 
     Context "Parse-Diagnostics with mixed operations" {
-        BeforeAll {
-            $ast = [System.Management.Automation.Language.Parser]::ParseFile($ScriptPath, [ref]$null, [ref]$null)
-            $functions = $ast.FindAll({ $args[0] -is [System.Management.Automation.Language.FunctionDefinitionAst] }, $false)
-            foreach ($fn in $functions) {
-                Invoke-Expression $fn.Extent.Text
-            }
+        $ast = [System.Management.Automation.Language.Parser]::ParseFile($ScriptPath, [ref]$null, [ref]$null)
+        $functions = $ast.FindAll({ $args[0] -is [System.Management.Automation.Language.FunctionDefinitionAst] }, $false)
+        foreach ($fn in $functions) {
+            Invoke-Expression $fn.Extent.Text
         }
 
         It "Returns diagnostics for both ld and bu operations" {

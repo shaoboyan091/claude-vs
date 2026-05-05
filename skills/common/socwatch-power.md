@@ -71,12 +71,6 @@ $workAvg = ($workload | Measure-Object -Property "Package Power (W)" -Average).A
 Write-Host "Delta: $([math]::Round($workAvg - $baseAvg, 2))W"
 ```
 
-### 6. Automated comparison script
-
-```powershell
-.\scripts\compare-power.ps1 -Baseline "C:\data\idle_baseline" -Test "C:\data\workload"
-```
-
 ## Expected Output
 
 - CSV files with per-second power/thermal/frequency readings

@@ -38,7 +38,7 @@ Chrome will display a dialog: "GPU process has pid XXXX, waiting for debugger."
 The dialog shows the PID directly. Alternatively:
 
 ```powershell
-.\scripts\find-process.ps1 -ProcessName "chrome" -Type "gpu"
+.\src\util\find-process.ps1 -ProcessName "chrome" -Type "gpu"
 # Or: look for chrome.exe with --type=gpu-process in command line
 Get-CimInstance Win32_Process -Filter "Name='chrome.exe'" |
   Where-Object { $_.CommandLine -match "--type=gpu-process" } |
@@ -48,7 +48,7 @@ Get-CimInstance Win32_Process -Filter "Name='chrome.exe'" |
 ### 3. Attach WinDbg
 
 ```powershell
-.\scripts\windbg-attach.ps1 -PID <gpu_pid>
+.\src\vs\windbg-attach.ps1 -ProcessId <gpu_pid>
 
 # Or manually:
 windbg -p <gpu_pid> -srcpath C:\work\chromium\src -y "srv*C:\symbols*https://msdl.microsoft.com/download/symbols;C:\work\chromium\src\out\Debug"

@@ -19,10 +19,10 @@
       "properties": {
         "success": { "type": "boolean" },
         "duration": { "type": "integer" },
-        "features": { "type": "array", "items": { "type": "string" } },
+        "features": { "type": "string", "description": "Comma-separated feature list" },
         "files": { "type": "array", "items": { "type": "string" } },
-        "csvSummary": { "type": "string" },
-        "summaryJson": { "type": "object" }
+        "csvSummary": { "type": "object", "description": "Parsed CSV summary with sections" },
+        "summaryJson": { "type": "string", "description": "Path to summary JSON file" }
       },
       "required": ["success", "duration", "features", "files"]
     },

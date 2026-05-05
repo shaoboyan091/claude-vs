@@ -26,9 +26,11 @@
         "PreCommands": { "type": "string", "description": "Extra cdb commands to run before breakpoints (semicolon-separated)" },
         "OutputLog": { "type": "string", "description": "Path to write debugger output log" },
         "CdbPath": { "type": "string", "description": "Path to cdb.exe" },
-        "Timeout": { "type": "integer", "default": 120, "description": "Timeout in seconds" }
+        "Timeout": { "type": "integer", "default": 120, "description": "Timeout in seconds" },
+        "SymbolModules": { "type": "array", "items": { "type": "string" }, "description": "Modules to load symbols for (e.g. dawn_native, chrome)" },
+        "DiscoverSymbols": { "type": "boolean", "description": "Search for symbols matching Breakpoints patterns instead of setting breakpoints" },
+        "ListModules": { "type": "boolean", "description": "List all loaded modules instead of setting breakpoints" }
       },
-      "required": ["Breakpoints"],
       "oneOf": [
         { "required": ["ProcessId"] },
         { "required": ["Executable"] }
@@ -77,9 +79,12 @@
         "processName": { "type": "string", "description": "Attach mode only" },
         "stdout": { "type": "string" },
         "stderr": { "type": "string" },
-        "logFile": { "type": "string" }
+        "logFile": { "type": "string" },
+        "diagnostics": { "type": "array", "items": { "type": "object", "properties": { "operation": { "type": "string" }, "target": { "type": "string" }, "status": { "type": "string" }, "message": { "type": "string" } } }, "description": "Diagnostic messages from symbol loading and breakpoint setting" },
+        "symbols": { "type": "object", "description": "Symbol discovery results (DiscoverSymbols mode)" },
+        "modules": { "type": "array", "items": { "type": "object" }, "description": "Module list (ListModules mode)" }
       },
-      "required": ["success", "mode", "breakpoints"]
+      "required": ["success", "mode"]
     },
     "errors": {
       "type": "object",

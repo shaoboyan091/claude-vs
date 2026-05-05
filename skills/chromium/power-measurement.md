@@ -65,11 +65,7 @@ socwatch.exe -m -f power -f gpu-freq -f thermal -t 60 -o C:\data\chrome_workload
 
 ### 6. Compare results
 
-```powershell
-.\scripts\compare-power.ps1 -Baseline "C:\data\chrome_idle_baseline" -Test "C:\data\chrome_workload"
-```
-
-Manual comparison:
+Compare results manually using the CSV summaries:
 
 ```powershell
 $idle = Import-Csv "C:\data\chrome_idle_baseline_power.csv"

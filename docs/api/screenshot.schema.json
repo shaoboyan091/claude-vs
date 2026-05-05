@@ -7,7 +7,7 @@
     "input": {
       "type": "object",
       "properties": {
-        "Pid": {
+        "ProcessId": {
           "type": "integer",
           "description": "Process ID of the target window"
         },

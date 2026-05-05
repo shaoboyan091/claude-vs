@@ -8,25 +8,31 @@
       "type": "object",
       "properties": {
         "Executable": { "type": "string", "description": "Executable to capture from" },
-        "Pid": { "type": "integer", "description": "Running process to inject into" },
+        "ProcessId": { "type": "integer", "description": "Running process to inject into" },
         "Replay": { "type": "string", "description": "Path to .rdc file to replay" },
         "OutputPath": { "type": "string", "description": "Output capture file path" },
         "CaptureFrame": { "type": "integer", "description": "Frame number to capture" },
         "CaptureDelay": { "type": "integer", "description": "Seconds to wait before capturing" },
         "Arguments": { "type": "string", "description": "Arguments for the executable" },
-        "ExportTextures": { "type": "boolean", "description": "Export textures during replay" }
+        "ExportTextures": { "type": "string", "description": "Directory to export textures to during replay" },
+        "RenderDocPath": { "type": "string", "description": "Path to renderdoccmd.exe (auto-detected if omitted)" },
+        "Timeout": { "type": "integer", "description": "Timeout in seconds (default: 120)" }
       }
     },
     "output": {
       "type": "object",
       "properties": {
         "success": { "type": "boolean" },
-        "mode": { "type": "string", "enum": ["capture", "inject", "replay"] },
+        "mode": { "type": "string", "enum": ["launch-capture", "inject", "replay"] },
         "outputPath": { "type": "string" },
         "stdout": { "type": "string" },
-        "stderr": { "type": "string" }
+        "stderr": { "type": "string" },
+        "capture": { "type": "string", "description": "Replay file path (replay mode)" },
+        "executable": { "type": "string", "description": "Executable path (launch-capture mode)" },
+        "pid": { "type": "integer", "description": "Process ID (inject mode)" },
+        "processName": { "type": "string", "description": "Process name (inject mode)" }
       },
-      "required": ["success", "mode", "outputPath"]
+      "required": ["success", "mode"]
     },
     "errors": {
       "type": "object",
